@@ -1,0 +1,39 @@
+@startuml
+' Используем нотацию "воронья лапка"
+title Conceptual ER Diagram — Бизнес-сущности
+
+entity "Заказ" as order {
+    * ID : UUID <<PK>>
+    *
+    Статус : string
+    Дата_создания : datetime
+}
+
+entity "Робот" as robot {
+    * ID : UUID <<PK>>
+    *
+    Название : string
+    Тип : string
+    Текущий_статус : string
+}
+
+entity "Задача" as task {
+    * ID : UUID <<PK>>
+    *
+    Описание : text
+    Статус : string
+    Приоритет : integer
+}
+
+entity "Локация" as location {
+    * ID : UUID <<PK>>
+    *
+    Название : string
+    Адрес : string
+}
+
+order ||--o{ task : "содержит"
+robot ||--o{ task : "выполняет"
+location ||--o{ task : "выполняется_в"
+
+@enduml

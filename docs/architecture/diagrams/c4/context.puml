@@ -1,0 +1,21 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+' Лейаут
+LAYOUT_WITH_LEGEND()
+title System Context Diagram — Robot Management System
+
+Person(user, "Оператор", "Управляет роботами через веб-интерфейс")
+Person(admin, "Администратор", "Настраивает систему и мониторит")
+
+System(robot_system, "Robot Management System", "Управляет роботами, задачами и локациями")
+
+System_Ext(external_api, "External API", "Сторонние сервисы (погода, карты)")
+System_Ext(monitoring, "Monitoring System", "Prometheus + Grafana")
+
+Rel(user, robot_system, "Использует", "HTTPS")
+Rel(admin, robot_system, "Администрирует", "HTTPS")
+Rel(robot_system, external_api, "Запрашивает данные", "REST/gRPC")
+Rel(robot_system, monitoring, "Отправляет метрики", "Prometheus")
+
+@enduml

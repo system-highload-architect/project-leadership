@@ -1,0 +1,47 @@
+@startuml
+' Более детальный ER с атрибутами
+title Logical ER Diagram — Детальная модель
+
+entity "orders" as orders {
+    * id : UUID <<PK>>
+    --
+    status : VARCHAR(20)
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    customer_id : UUID <<FK>>
+}
+
+entity "robots" as robots {
+    * id : UUID <<PK>>
+    --
+    name : VARCHAR(100)
+    type : VARCHAR(50)
+    status : VARCHAR(20)
+    location_id : UUID <<FK>>
+}
+
+entity "tasks" as tasks {
+    * id : UUID <<PK>>
+    --
+    description : TEXT
+    status : VARCHAR(20)
+    priority : INTEGER
+    order_id : UUID <<FK>>
+    robot_id : UUID <<FK>>
+    location_id : UUID <<FK>>
+}
+
+entity "locations" as locations {
+    * id : UUID <<PK>>
+    --
+    name : VARCHAR(100)
+    address : TEXT
+    capacity : INTEGER
+}
+
+orders ||--o{ tasks : "содержит"
+robots ||--o{ tasks : "выполняет"
+locations ||--o{ tasks : "выполняется_в"
+locations ||--o{ robots : "находится_в"
+
+@enduml
