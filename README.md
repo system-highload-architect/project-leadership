@@ -80,23 +80,15 @@
 
 ---
 
-## 🚀 Быстрый старт
+## 🛠️ Команды для работы с документацией и диаграммами
 
-```bash
-# Клонирование
-git clone <repo-url>
-cd project-leadership
-
-# Генерация диаграмм из PlantUML
-make generate-diagrams
-
-# Просмотр документации (если используется docToolchain)
-make docs
-
-# Запуск примера (например, circuit-breaker)
-cd patterns-examples/circuit-breaker
-go test -v
-```
+| Команда | Описание |
+|---------|----------|
+| `make setup` | Установка всех необходимых зависимостей (PlantUML, mkdocs, markdown-link-check) |
+| `make generate-diagrams` | Генерация SVG из всех `.puml` файлов в проекте |
+| `make docs` | Генерация HTML-документации из Markdown с помощью mkdocs |
+| `make validate` | Проверка целостности документации и ссылок |
+| `make clean` | Удаление сгенерированных SVG и HTML-файлов |
 
 ---
 

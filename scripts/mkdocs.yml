@@ -1,0 +1,63 @@
+site_name: Project Leadership — Документация
+site_description: Архитектурные шаблоны и практики для Tech Lead / Architect
+theme:
+  name: material
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+
+nav:
+  - Главная: index.md
+  - Стратегические документы:
+      - Видение продукта: docs/strategic/product-vision.md
+      - Дорожная карта: docs/strategic/roadmap.md
+      - Архитектурная стратегия: docs/strategic/architecture-strategy.md
+      - Бюджет и ресурсы: docs/strategic/budget-resources.md
+  - Архитектурные документы:
+      - Обзор: docs/architecture/README.md
+      - ADR: docs/architecture/adr/README.md
+      - API-контракты: docs/architecture/api-contracts/README.md
+      - Модель данных: docs/architecture/data-model/README.md
+      - Диаграммы: docs/architecture/diagrams/README.md
+  - Проектные документы:
+      - Обзор: docs/project-management/README.md
+      - Техническое задание: docs/project-management/technical-spec.md
+      - План спринта: docs/project-management/sprint-planning.md
+      - Инженерные практики: docs/project-management/engineering-practices.md
+  - Люди и процессы:
+      - Обзор: docs/people-processes/README.md
+      - Матрица компетенций: docs/people-processes/competency-matrix.md
+      - Индивидуальные планы развития: docs/people-processes/individual-development-plan.md
+      - Онбординг: docs/people-processes/onboarding.md
+      - Регламенты встреч: docs/people-processes/meetings-guidelines.md
+  - Операционные документы:
+      - Обзор: docs/operations/README.md
+      - Deployment: docs/operations/deployment.md
+      - Runbook: docs/operations/runbook.md
+      - SLO/SLI: docs/operations/slo-sli.md
+      - Disaster Recovery: docs/operations/disaster-recovery.md
+  - Шаблоны:
+      - Обзор: docs/templates/README.md
+      - ADR шаблон: docs/templates/adr-template.md
+      - ТЗ шаблон: docs/templates/technical-spec-template.md
+      - Meeting notes шаблон: docs/templates/meeting-notes-template.md
+
+plugins:
+  - search
+  - markdown.extensions.toc:
+      permalink: true
+
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.details
