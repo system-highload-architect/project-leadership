@@ -1,21 +1,19 @@
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 
-' Лейаут
 LAYOUT_WITH_LEGEND()
-title System Context Diagram — Robot Management System
+title System Context Diagram — Order Management System
 
-Person(user, "Оператор", "Управляет роботами через веб-интерфейс")
-Person(admin, "Администратор", "Настраивает систему и мониторит")
+Person(customer, "Customer", "Покупатель, который размещает заказы")
+Person(admin, "Admin", "Администратор, управляющий продуктами и заказами")
 
-System(robot_system, "Robot Management System", "Управляет роботами, задачами и локациями")
+System(oms, "Order Management System", "Управляет заказами, платежами и уведомлениями")
 
-System_Ext(external_api, "External API", "Сторонние сервисы (погода, карты)")
-System_Ext(monitoring, "Monitoring System", "Prometheus + Grafana")
+System_Ext(payment_gateway, "Payment Gateway", "Внешняя система для обработки платежей")
+System_Ext(notification_service, "Notification Service", "Внешняя система для отправки уведомлений")
 
-Rel(user, robot_system, "Использует", "HTTPS")
-Rel(admin, robot_system, "Администрирует", "HTTPS")
-Rel(robot_system, external_api, "Запрашивает данные", "REST/gRPC")
-Rel(robot_system, monitoring, "Отправляет метрики", "Prometheus")
-
+Rel(customer, oms, "Размещает заказы", "HTTPS")
+Rel(admin, oms, "Управляет продуктами", "HTTPS")
+Rel(oms, payment_gateway, "Обрабатывает платежи", "HTTPS")
+Rel(oms, notification_service, "Отправляет уведомления", "SMTP/HTTP")
 @enduml

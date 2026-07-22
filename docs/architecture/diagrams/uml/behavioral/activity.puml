@@ -1,0 +1,23 @@
+@startuml
+start
+:Select Products;
+:Add to Cart;
+:Checkout;
+if (Is Registered?) then (Yes)
+    :Login;
+else (No)
+    :Register;
+endif
+:Enter Shipping Address;
+:Select Payment Method;
+:Process Payment;
+if (Payment Successful?) then (Yes)
+    :Confirm Order;
+    :Send Notification;
+    stop
+else (No)
+    :Show Error;
+    :Retry Payment;
+    stop
+endif
+@enduml

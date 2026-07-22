@@ -1,0 +1,32 @@
+@startuml
+' Эмуляция профиля через классы со стереотипами
+class Order <<Entity>> {
+    tableName = "orders"
+    version = 1
+    - id: UUID
+    - status: OrderStatus
+}
+
+class OrderService <<Service>> {
+    + createOrder(dto: OrderDTO): Order
+    + cancelOrder(id: UUID): void
+    + getOrder(id: UUID): Order
+}
+
+class OrderRepository <<Repository>> {
+    + save(order: Order): void
+    + findById(id: UUID): Order
+    + findAll(): List<Order>
+}
+
+class OrderDTO <<DTO>> {
+    + id: UUID
+    + status: String
+    + items: OrderItemDTO[]
+}
+
+' Связи между классами со стереотипами
+OrderService ..> Order : uses
+OrderService ..> OrderDTO : uses
+OrderRepository ..> Order : uses
+@enduml

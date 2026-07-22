@@ -1,47 +1,61 @@
 @startuml
-' Более детальный ER с атрибутами
-title Logical ER Diagram — Детальная модель
+title Logical ER Diagram — Order Management System
+
+entity "customers" as customers {
+    * id : UUID <<PK>>
+    --
+    name : VARCHAR(100)
+    email : VARCHAR(100) UNIQUE
+    phone : VARCHAR(20)
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
 
 entity "orders" as orders {
     * id : UUID <<PK>>
     --
+    customer_id : UUID <<FK>>
     status : VARCHAR(20)
+    total_amount : DECIMAL(10,2)
     created_at : TIMESTAMP
     updated_at : TIMESTAMP
-    customer_id : UUID <<FK>>
+    shipped_at : TIMESTAMP
 }
 
-entity "robots" as robots {
+entity "order_items" as order_items {
     * id : UUID <<PK>>
     --
-    name : VARCHAR(100)
-    type : VARCHAR(50)
-    status : VARCHAR(20)
-    location_id : UUID <<FK>>
-}
-
-entity "tasks" as tasks {
-    * id : UUID <<PK>>
-    --
-    description : TEXT
-    status : VARCHAR(20)
-    priority : INTEGER
     order_id : UUID <<FK>>
-    robot_id : UUID <<FK>>
-    location_id : UUID <<FK>>
+    product_id : UUID <<FK>>
+    quantity : INTEGER
+    price : DECIMAL(10,2)
+    total : DECIMAL(10,2)
 }
 
-entity "locations" as locations {
+entity "products" as products {
     * id : UUID <<PK>>
     --
     name : VARCHAR(100)
-    address : TEXT
-    capacity : INTEGER
+    description : TEXT
+    price : DECIMAL(10,2)
+    stock : INTEGER
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
 }
 
-orders ||--o{ tasks : "содержит"
-robots ||--o{ tasks : "выполняет"
-locations ||--o{ tasks : "выполняется_в"
-locations ||--o{ robots : "находится_в"
+entity "payments" as payments {
+    * id : UUID <<PK>>
+    --
+    order_id : UUID <<FK>>
+    amount : DECIMAL(10,2)
+    method : VARCHAR(20)
+    status : VARCHAR(20)
+    transaction_id : VARCHAR(100)
+    created_at : TIMESTAMP
+}
 
+customers ||--o{ orders : "places"
+orders ||--|{ order_items : "contains"
+products ||--o{ order_items : "referenced in"
+orders ||--o{ payments : "has"
 @enduml

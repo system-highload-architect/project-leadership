@@ -1,0 +1,53 @@
+@startuml
+title Class Diagram — Task Management System (Example)
+
+' === Перечисления ===
+enum TaskStatus {
+    TODO
+    IN_PROGRESS
+    DONE
+}
+
+enum UserRole {
+    ADMIN
+    USER
+    GUEST
+}
+
+' === Классы ===
+class User {
+    - id: UUID
+    - username: String
+    - email: String
+    - role: UserRole
+    + createTask(title: String, description: String): Task
+    + assignTask(task: Task, user: User): void
+}
+
+class Task {
+    - id: UUID
+    - title: String
+    - description: String
+    - status: TaskStatus
+    - createdAt: Date
+    - updatedAt: Date
+    + changeStatus(newStatus: TaskStatus): void
+    + assignTo(user: User): void
+}
+
+class Project {
+    - id: UUID
+    - name: String
+    - description: String
+    - startDate: Date
+    - endDate: Date
+    + addTask(task: Task): void
+    + getTasksByStatus(status: TaskStatus): List<Task>
+}
+
+' === Отношения ===
+Project "1" -- "0..*" Task : contains
+User "1" -- "0..*" Task : created by
+User "0..*" -- "0..*" Task : assigned to
+
+@enduml

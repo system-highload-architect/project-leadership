@@ -1,0 +1,48 @@
+@startuml
+!define RECTANGLE class
+
+package "Presentation Layer" {
+    [Web Controllers]
+    [API Gateways]
+}
+
+package "Business Layer" {
+    [Order Service]
+    [Payment Service]
+    [Notification Service]
+}
+
+package "Domain Layer" {
+    [Order]
+    [OrderItem]
+    [Customer]
+    [Payment]
+    [Repository Interfaces]
+}
+
+package "Data Access Layer" {
+    [Order Repository]
+    [Customer Repository]
+    [Payment Repository]
+}
+
+package "Infrastructure" {
+    [Logger]
+    [Config]
+    [DB Context]
+}
+
+package "Common" {
+    [DTOs]
+    [Exceptions]
+    [Enums]
+}
+
+Presentation ..> Business
+Business ..> Domain
+Business ..> Common
+Data ..> Domain
+Data ..> Infrastructure
+Data ..> Common
+Infrastructure ..> Common
+@enduml

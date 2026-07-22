@@ -1,0 +1,23 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+title Dynamic Diagram — Place Order Flow
+
+Person(customer, "Customer")
+System_Ext(web_ui, "Web UI")
+System_Ext(api_gateway, "API Gateway")
+System_Ext(order_service, "Order Service")
+System_Ext(payment_service, "Payment Service")
+System_Ext(payment_gateway, "Payment Gateway")
+System_Ext(notification_service, "Notification Service")
+
+Rel(customer, web_ui, "1. Place order")
+Rel(web_ui, api_gateway, "2. POST /orders")
+Rel(api_gateway, order_service, "3. CreateOrder")
+Rel(order_service, payment_service, "4. ProcessPayment")
+Rel(payment_service, payment_gateway, "5. Authorize payment")
+Rel(payment_gateway, payment_service, "6. Payment success")
+Rel(payment_service, order_service, "7. Payment completed")
+Rel(order_service, notification_service, "8. Send confirmation")
+Rel(notification_service, customer, "9. Email notification")
+@enduml

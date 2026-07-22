@@ -1,0 +1,21 @@
+@startuml
+' Компоненты
+component "Order Service" as OrderService
+component "Payment Service" as PaymentService
+component "Notification Service" as NotificationService
+component "Order Repository" as OrderRepo
+component "Payment Repository" as PaymentRepo
+
+' Интерфейсы
+interface "IOrder" as IOrder
+interface "IPayment" as IPayment
+interface "INotification" as INotification
+
+' Связи
+OrderService -- IOrder
+OrderService -- INotification
+PaymentService -- IPayment
+OrderService ..> OrderRepo : uses
+PaymentService ..> PaymentRepo : uses
+NotificationService ..> OrderService : uses
+@enduml

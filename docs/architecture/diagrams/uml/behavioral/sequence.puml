@@ -1,0 +1,18 @@
+@startuml
+actor Customer
+participant "Frontend" as FE
+participant "Order Service" as OS
+participant "Payment Service" as PS
+database "Database" as DB
+
+Customer -> FE : place order
+FE -> OS : createOrder(orderDTO)
+OS -> DB : save order
+DB --> OS : order saved
+OS -> PS : processPayment(paymentInfo)
+PS -> DB : save payment
+DB --> PS : payment saved
+PS --> OS : payment success
+OS --> FE : order confirmed
+FE --> Customer : confirmation
+@enduml

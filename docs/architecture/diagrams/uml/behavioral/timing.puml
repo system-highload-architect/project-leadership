@@ -1,0 +1,16 @@
+@startuml
+' Временная диаграмма для заказа (Order)
+' Показывает изменение состояния заказа во времени
+
+concise "Order State" as OrderState
+
+@0
+OrderState is NEW
+@10
+OrderState is PAID
+@20
+OrderState is SHIPPED
+@30
+OrderState is DELIVERED
+
+@enduml

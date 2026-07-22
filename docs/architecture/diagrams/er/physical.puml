@@ -1,58 +1,74 @@
 @startuml
-' Физическая схема с индексами и типами данных
-title Physical ER Diagram — Схема БД
+title Physical ER Diagram — Order Management System (PostgreSQL)
+
+entity "customers" as customers {
+    * id : UUID <<PK>>
+    --
+    name : VARCHAR(100) NOT NULL
+    email : VARCHAR(100) NOT NULL UNIQUE
+    phone : VARCHAR(20)
+    created_at : TIMESTAMP DEFAULT NOW()
+    updated_at : TIMESTAMP DEFAULT NOW()
+    *
+    INDEX idx_customers_email (email)
+}
 
 entity "orders" as orders {
     * id : UUID <<PK>>
     --
-    status : VARCHAR(20) NOT NULL
+    customer_id : UUID NOT NULL <<FK>>
+    status : VARCHAR(20) NOT NULL DEFAULT 'NEW'
+    total_amount : DECIMAL(10,2) NOT NULL DEFAULT 0.00
     created_at : TIMESTAMP DEFAULT NOW()
     updated_at : TIMESTAMP DEFAULT NOW()
-    customer_id : UUID NOT NULL <<FK>>
+    shipped_at : TIMESTAMP
     *
     INDEX idx_orders_customer (customer_id)
     INDEX idx_orders_status (status)
 }
 
-entity "robots" as robots {
+entity "order_items" as order_items {
     * id : UUID <<PK>>
     --
-    name : VARCHAR(100) NOT NULL
-    type : VARCHAR(50) NOT NULL
-    status : VARCHAR(20) NOT NULL
-    location_id : UUID <<FK>>
-    *
-    INDEX idx_robots_location (location_id)
-    INDEX idx_robots_status (status)
-}
-
-entity "tasks" as tasks {
-    * id : UUID <<PK>>
-    --
-    description : TEXT NOT NULL
-    status : VARCHAR(20) NOT NULL
-    priority : INTEGER DEFAULT 0
     order_id : UUID NOT NULL <<FK>>
-    robot_id : UUID <<FK>>
-    location_id : UUID <<FK>>
+    product_id : UUID NOT NULL <<FK>>
+    quantity : INTEGER NOT NULL CHECK (quantity > 0)
+    price : DECIMAL(10,2) NOT NULL
+    total : DECIMAL(10,2) GENERATED ALWAYS AS (quantity * price) STORED
     *
-    INDEX idx_tasks_order (order_id)
-    INDEX idx_tasks_robot (robot_id)
-    INDEX idx_tasks_location (location_id)
-    INDEX idx_tasks_status_priority (status, priority)
+    INDEX idx_order_items_order (order_id)
+    INDEX idx_order_items_product (product_id)
 }
 
-entity "locations" as locations {
+entity "products" as products {
     * id : UUID <<PK>>
     --
     name : VARCHAR(100) NOT NULL
-    address : TEXT
-    capacity : INTEGER DEFAULT 0
+    description : TEXT
+    price : DECIMAL(10,2) NOT NULL CHECK (price >= 0)
+    stock : INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0)
+    created_at : TIMESTAMP DEFAULT NOW()
+    updated_at : TIMESTAMP DEFAULT NOW()
+    *
+    INDEX idx_products_name (name)
 }
 
-orders ||--o{ tasks : "CASCADE"
-robots ||--o{ tasks : "SET NULL"
-locations ||--o{ tasks : "RESTRICT"
-locations ||--o{ robots : "SET NULL"
+entity "payments" as payments {
+    * id : UUID <<PK>>
+    --
+    order_id : UUID NOT NULL <<FK>>
+    amount : DECIMAL(10,2) NOT NULL
+    method : VARCHAR(20) NOT NULL
+    status : VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+    transaction_id : VARCHAR(100) UNIQUE
+    created_at : TIMESTAMP DEFAULT NOW()
+    *
+    INDEX idx_payments_order (order_id)
+    INDEX idx_payments_status (status)
+}
 
+customers ||--o{ orders : "ON DELETE RESTRICT"
+orders ||--|{ order_items : "ON DELETE CASCADE"
+products ||--o{ order_items : "ON DELETE RESTRICT"
+orders ||--o{ payments : "ON DELETE CASCADE"
 @enduml

@@ -1,21 +1,21 @@
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title Component Diagram — Robot Service
+LAYOUT_WITH_LEGEND()
+title Component Diagram — Order Service
 
-Container(robot_service, "Robot Service", "Go", "Управление роботами")
+Container(order_service, "Order Service", "Go", "Управление заказами")
 
-Component(handler, "HTTP Handler", "Gin", "Принимает запросы")
-Component(usecase, "Use Cases", "Go", "Бизнес-логика")
+Component(controller, "Order Controller", "Gin", "Обрабатывает HTTP-запросы")
+Component(usecase, "Order Use Cases", "Go", "Бизнес-логика заказов")
 Component(domain, "Domain", "Go", "Сущности и правила")
-Component(repo, "Repository", "Go", "Интерфейс доступа к данным")
-Component(postgres_adapter, "Postgres Adapter", "Go + pgx", "Реализация репозитория")
+Component(repo_interface, "Repository Interface", "Go", "Интерфейс доступа к данным")
+Component(repo_impl, "Postgres Repository", "Go + pgx", "Реализация репозитория")
 Component(kafka_adapter, "Kafka Adapter", "Go + Sarama", "Публикация событий")
 
-Rel(handler, usecase, "Вызывает", "зависит")
-Rel(usecase, domain, "Использует", "зависит")
-Rel(usecase, repo, "Вызывает", "зависит")
-Rel(postgres_adapter, repo, "Реализует", "реализует интерфейс")
-Rel(kafka_adapter, usecase, "Реализует", "реализует интерфейс")
-
+Rel(controller, usecase, "Вызывает")
+Rel(usecase, domain, "Использует")
+Rel(usecase, repo_interface, "Вызывает")
+Rel(repo_impl, repo_interface, "Реализует")
+Rel(usecase, kafka_adapter, "Публикует события")
 @enduml

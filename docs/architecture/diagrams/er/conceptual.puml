@@ -1,39 +1,14 @@
 @startuml
-' Используем нотацию "воронья лапка"
-title Conceptual ER Diagram — Бизнес-сущности
+title Conceptual ER Diagram — Order Management System
 
-entity "Заказ" as order {
-    * ID : UUID <<PK>>
-    *
-    Статус : string
-    Дата_создания : datetime
-}
+entity "Customer" as customer
+entity "Order" as order
+entity "Order Item" as order_item
+entity "Product" as product
+entity "Payment" as payment
 
-entity "Робот" as robot {
-    * ID : UUID <<PK>>
-    *
-    Название : string
-    Тип : string
-    Текущий_статус : string
-}
-
-entity "Задача" as task {
-    * ID : UUID <<PK>>
-    *
-    Описание : text
-    Статус : string
-    Приоритет : integer
-}
-
-entity "Локация" as location {
-    * ID : UUID <<PK>>
-    *
-    Название : string
-    Адрес : string
-}
-
-order ||--o{ task : "содержит"
-robot ||--o{ task : "выполняет"
-location ||--o{ task : "выполняется_в"
-
+customer ||--o{ order : "places"
+order ||--|{ order_item : "contains"
+product ||--o{ order_item : "referenced in"
+order ||--o{ payment : "has"
 @enduml

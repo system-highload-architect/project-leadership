@@ -1,0 +1,43 @@
+@startuml
+class Order {
+    - id: UUID
+    - status: OrderStatus
+    - createdDate: Date
+}
+
+class OrderItem {
+    - productId: UUID
+    - quantity: int
+    - price: Money
+}
+
+class DeliveryInfo {
+    - address: String
+    - deliveryDate: Date
+    - trackingNumber: String
+}
+
+class PaymentInfo {
+    - paymentMethod: PaymentMethod
+    - amount: Money
+    - status: PaymentStatus
+}
+
+' Композиция (закрашенный ромб)
+Order *-- "0..*" OrderItem : contains
+Order *-- "0..1" DeliveryInfo : has
+Order *-- "0..1" PaymentInfo : has
+
+' Внутренняя структура Order (визуализация частей внутри класса)
+class OrderStructure {
+    + order: Order
+    + items: OrderItem[]
+    + delivery: DeliveryInfo
+    + payment: PaymentInfo
+}
+
+OrderStructure -- Order : contains
+OrderStructure -- OrderItem : contains
+OrderStructure -- DeliveryInfo : contains
+OrderStructure -- PaymentInfo : contains
+@enduml

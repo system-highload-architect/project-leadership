@@ -1,0 +1,44 @@
+@startuml
+title Object Diagram — Task Management System (Example)
+
+' --- Экземпляры (Объекты) ---
+object "alice:User" as alice {
+    id = "123e4567-e89b-12d3-a456-426614174000"
+    username = "alice"
+    email = "alice@example.com"
+    role = ADMIN
+}
+
+object "bob:User" as bob {
+    id = "123e4567-e89b-12d3-a456-426614174001"
+    username = "bob"
+    email = "bob@example.com"
+    role = USER
+}
+
+object "task1:Task" as task1 {
+    id = "123e4567-e89b-12d3-a456-426614174100"
+    title = "Design Database Schema"
+    status = DONE
+}
+
+object "task2:Task" as task2 {
+    id = "123e4567-e89b-12d3-a456-426614174101"
+    title = "Implement REST API"
+    status = IN_PROGRESS
+}
+
+object "project1:Project" as project1 {
+    id = "123e4567-e89b-12d3-a456-426614174200"
+    name = "Project Leadership"
+    description = "Architecture templates and patterns"
+}
+
+' --- Связи (Links) ---
+alice -- task1 : created
+alice -- task2 : created
+bob -- task2 : assigned
+project1 -- task1 : contains
+project1 -- task2 : contains
+
+@enduml

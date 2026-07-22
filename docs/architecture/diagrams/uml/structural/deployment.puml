@@ -1,0 +1,30 @@
+@startuml
+node "Web Server" as WebServer {
+    artifact "order-system.war" as War
+}
+
+node "Application Server" as AppServer {
+    artifact "order-service.jar" as Jar
+    artifact "payment-service.jar" as PaymentJar
+}
+
+node "Database Server" as DbServer {
+    artifact "postgresql" as Postgres
+}
+
+' Артефакты
+artifact "nginx.conf" as NginxConf
+artifact "application.properties" as AppProps
+
+' Развертывание
+War -- AppServer : deployed on
+Jar -- AppServer : deployed on
+PaymentJar -- AppServer : deployed on
+Postgres -- DbServer : deployed on
+NginxConf -- WebServer : deployed on
+AppProps -- AppServer : deployed on
+
+' Коммуникационные пути
+WebServer -- AppServer : HTTP
+AppServer -- DbServer : JDBC
+@enduml

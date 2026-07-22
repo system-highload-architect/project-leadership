@@ -1,0 +1,11 @@
+@startuml
+[*] --> NEW : create order
+NEW --> PAID : payment received
+NEW --> CANCELLED : cancel order
+PAID --> SHIPPED : ship order
+PAID --> CANCELLED : cancel order (refund)
+SHIPPED --> DELIVERED : deliver order
+SHIPPED --> CANCELLED : return order
+DELIVERED --> [*]
+CANCELLED --> [*]
+@enduml

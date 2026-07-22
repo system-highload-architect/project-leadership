@@ -1,30 +1,28 @@
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title Container Diagram — Robot Management System
+LAYOUT_WITH_LEGEND()
+title Container Diagram — Order Management System
 
-Person(user, "Оператор", "Управляет роботами")
+Person(customer, "Customer", "Покупатель")
 
-System_Boundary(robot_system, "Robot Management System") {
+System_Boundary(oms, "Order Management System") {
     Container(web_ui, "Web UI", "React", "Пользовательский интерфейс")
-    Container(api_gateway, "API Gateway", "Go + Gin", "Единая точка входа, аутентификация")
-    Container(order_service, "Order Service", "Go + Clean Architecture", "Управление заказами")
-    Container(robot_service, "Robot Service", "Go + Clean Architecture", "Управление роботами")
-    Container(task_service, "Task Service", "Go + Clean Architecture", "Управление задачами")
-    ContainerDb(postgres, "PostgreSQL", "БД заказов, роботов, задач")
-    Container(kafka, "Kafka", "Брокер событий")
+    Container(api_gateway, "API Gateway", "Go + Gin", "Единая точка входа")
+    Container(order_service, "Order Service", "Go", "Управление заказами")
+    Container(payment_service, "Payment Service", "Go", "Управление платежами")
+    ContainerDb(postgres, "PostgreSQL", "Хранилище данных")
 }
 
-Rel(user, web_ui, "Использует", "HTTPS")
+System_Ext(payment_gateway, "Payment Gateway", "Внешний платежный шлюз")
+System_Ext(notification_service, "Notification Service", "Внешняя система уведомлений")
+
+Rel(customer, web_ui, "Использует", "HTTPS")
 Rel(web_ui, api_gateway, "Вызывает", "HTTPS")
 Rel(api_gateway, order_service, "Маршрутизирует", "gRPC")
-Rel(order_service, robot_service, "Вызывает", "gRPC")
-Rel(robot_service, task_service, "Вызывает", "gRPC")
+Rel(order_service, payment_service, "Вызывает", "gRPC")
 Rel(order_service, postgres, "Читает/пишет", "SQL")
-Rel(robot_service, postgres, "Читает/пишет", "SQL")
-Rel(task_service, postgres, "Читает/пишет", "SQL")
-Rel(order_service, kafka, "Публикует события", "Kafka")
-Rel(robot_service, kafka, "Публикует события", "Kafka")
-Rel(task_service, kafka, "Публикует события", "Kafka")
-
+Rel(payment_service, postgres, "Читает/пишет", "SQL")
+Rel(order_service, notification_service, "Отправляет уведомления", "SMTP/HTTP")
+Rel(payment_service, payment_gateway, "Обрабатывает платежи", "HTTPS")
 @enduml

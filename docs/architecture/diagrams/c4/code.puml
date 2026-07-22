@@ -1,0 +1,107 @@
+@startuml
+title Code Diagram — Order Service (Go)
+
+' Сущности (Domain)
+class Order {
+  - ID: uuid.UUID
+  - Status: OrderStatus
+  - CreatedAt: time.Time
+  - Items: []OrderItem
+  + GetTotal(): Money
+  + AddItem(item: OrderItem): void
+  + Cancel(): void
+}
+
+class OrderItem {
+  - ProductID: uuid.UUID
+  - Quantity: int
+  - Price: Money
+  + GetSubtotal(): Money
+}
+
+class Customer {
+  - ID: uuid.UUID
+  - Name: string
+  - Email: string
+}
+
+enum OrderStatus {
+  NEW
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+' Интерфейсы (Ports)
+interface OrderRepository {
+  + Save(ctx context.Context, order *Order): error
+  + FindByID(ctx context.Context, id uuid.UUID): (*Order, error)
+  + FindAll(ctx context.Context): ([]*Order, error)
+}
+
+interface EventPublisher {
+  + Publish(ctx context.Context, event Event): error
+}
+
+' Use Cases (Сервисы)
+class OrderService {
+  - repo: OrderRepository
+  - events: EventPublisher
+  + CreateOrder(ctx context.Context, dto CreateOrderDTO): (*Order, error)
+  + CancelOrder(ctx context.Context, id uuid.UUID): error
+  + GetOrder(ctx context.Context, id uuid.UUID): (*Order, error)
+}
+
+' Реализации (Adapters)
+class PostgresOrderRepo {
+  - db: *sql.DB
+  + Save(ctx context.Context, order *Order): error
+  + FindByID(ctx context.Context, id uuid.UUID): (*Order, error)
+  + FindAll(ctx context.Context): ([]*Order, error)
+}
+
+class KafkaEventPublisher {
+  - producer: sarama.SyncProducer
+  + Publish(ctx context.Context, event Event): error
+}
+
+' Зависимости
+Order "1" *-- "0..*" OrderItem : contains
+Order "1" -- "0..1" Customer : belongs to
+OrderService ..> OrderRepository : uses
+OrderService ..> EventPublisher : uses
+PostgresOrderRepo ..|> OrderRepository : implements
+KafkaEventPublisher ..|> EventPublisher : implements
+OrderService --> Order : creates
+OrderService --> OrderItem : manages
+
+' Аннотации с кодом (для наглядности)
+note bottom of Order
+  type Order struct {
+    ID        uuid.UUID
+    Status    OrderStatus
+    CreatedAt time.Time
+    Items     []OrderItem
+  }
+end note
+
+note bottom of OrderRepository
+  type OrderRepository interface {
+    Save(ctx context.Context, order *Order) error
+    FindByID(ctx context.Context, id uuid.UUID) (*Order, error)
+    FindAll(ctx context.Context) ([]*Order, error)
+  }
+end note
+
+note bottom of OrderService
+  type OrderService struct {
+    repo   OrderRepository
+    events EventPublisher
+  }
+  
+  func (s *OrderService) CreateOrder(ctx context.Context, dto CreateOrderDTO) (*Order, error)
+  func (s *OrderService) CancelOrder(ctx context.Context, id uuid.UUID) error
+  func (s *OrderService) GetOrder(ctx context.Context, id uuid.UUID) (*Order, error)
+end note
+@enduml

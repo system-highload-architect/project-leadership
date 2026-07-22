@@ -1,0 +1,32 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+title Deployment Diagram — Order Management System
+
+Deployment_Node(web_server, "Web Server", "Nginx") {
+    Container(web_ui, "Web UI", "React", "Статические файлы")
+}
+
+Deployment_Node(app_server, "Application Server", "Kubernetes Pod") {
+    Container(api_gateway, "API Gateway", "Go", "Единая точка входа")
+    Container(order_service, "Order Service", "Go", "Управление заказами")
+    Container(payment_service, "Payment Service", "Go", "Управление платежами")
+}
+
+Deployment_Node(db_server, "Database Server", "PostgreSQL 15") {
+    ContainerDb(postgres, "PostgreSQL", "Хранилище данных")
+}
+
+Deployment_Node(external, "External Systems", "Cloud") {
+    System_Ext(payment_gateway, "Payment Gateway")
+    System_Ext(notification_service, "Notification Service")
+}
+
+Rel(web_ui, api_gateway, "HTTPS")
+Rel(api_gateway, order_service, "gRPC")
+Rel(order_service, payment_service, "gRPC")
+Rel(order_service, postgres, "SQL")
+Rel(payment_service, postgres, "SQL")
+Rel(payment_service, payment_gateway, "HTTPS")
+Rel(order_service, notification_service, "SMTP/HTTP")
+@enduml
