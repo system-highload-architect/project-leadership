@@ -193,7 +193,7 @@ protoc --doc_out=. --doc_opt=markdown,api.md proto/*.proto
 
 - [Архитектурные документы](../README.md) — общий раздел архитектуры.
 - [Модель данных](../data-model/README.md) — структура данных, которые передаются через API.
-- [ADR: Выбор gRPC vs REST](../../adr/008-grpc-vs-rest.md) — обоснование использования gRPC.
+- [ADR: Выбор gRPC vs REST](../adr/008-grpc-vs-rest.md) — обоснование использования gRPC.
 
 ---
 
