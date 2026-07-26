@@ -1,0 +1,53 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+title Контекстная диаграмма — E‑Commerce Platform (Serverless)
+
+Person(customer, "Покупатель", "Просматривает каталог, оформляет заказы")
+Person(manager, "Менеджер", "Управляет товарами и заказами")
+Person(admin, "Администратор", "Управляет пользователями и настройками")
+
+System_Boundary(ecommerce, "E‑Commerce Platform (Serverless)") {
+    System(api_gateway, "API Gateway", "Единая точка входа, маршрутизация")
+    System(kafka, "Kafka", "Брокер событий")
+    System(order_service, "Order Service", "Микросервис (контейнер)")
+    System(payment_service, "Payment Service", "Микросервис (контейнер)")
+    System(inventory_service, "Inventory Service", "Микросервис (контейнер)")
+    System(notification_function, "Notification Function", "Serverless (AWS Lambda)")
+    System(report_function, "Report Function", "Serverless (AWS Lambda)")
+    System(export_function, "Export Function", "Serverless (AWS Lambda)")
+}
+
+System_Ext(payment_gateway, "Платёжный шлюз")
+System_Ext(delivery_service, "Сервис доставки")
+
+Rel(customer, api_gateway, "Использует", "HTTPS")
+Rel(manager, api_gateway, "Использует", "HTTPS")
+Rel(admin, api_gateway, "Использует", "HTTPS")
+
+Rel(api_gateway, order_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, payment_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, inventory_service, "Маршрутизирует", "gRPC")
+
+Rel(order_service, kafka, "Публикует события", "Kafka")
+Rel(payment_service, kafka, "Публикует события", "Kafka")
+Rel(inventory_service, kafka, "Публикует события", "Kafka")
+
+Rel(kafka, notification_function, "Триггерит", "Kafka")
+Rel(kafka, report_function, "Триггерит", "Kafka")
+Rel(kafka, export_function, "Триггерит", "Kafka")
+
+Rel(payment_service, payment_gateway, "Обрабатывает платежи", "HTTPS")
+Rel(order_service, delivery_service, "Создаёт заявки", "HTTP")
+
+note right of notification_function
+  Serverless функции:
+  - Обработка уведомлений (email, SMS, push)
+  - Генерация отчётов
+  - Экспорт данных
+  - Масштабируются автоматически
+  - Оплата за выполнение
+end note
+
+@enduml

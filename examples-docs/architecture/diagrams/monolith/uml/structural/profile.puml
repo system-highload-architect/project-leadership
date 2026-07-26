@@ -1,0 +1,36 @@
+@startuml
+' Profile Diagram — E‑Commerce Platform Stereotypes
+' PlantUML не поддерживает синтаксис профилей напрямую,
+' поэтому используем классы со стереотипами для демонстрации.
+
+class Order <<Entity>> {
+  tableName = "orders"
+  version = 1
+  - id: UUID
+  - status: OrderStatus
+}
+
+class OrderService <<Service>> {
+  + createOrder(dto: CreateOrderDTO): Order
+  + cancelOrder(id: UUID): void
+  + getOrder(id: UUID): Order
+}
+
+class OrderRepository <<Repository>> {
+  + save(order: Order): void
+  + findById(id: UUID): Order
+  + findAll(): List<Order>
+}
+
+class OrderDTO <<DTO>> {
+  + id: UUID
+  + status: String
+  + items: OrderItemDTO[]
+}
+
+' Зависимости
+OrderService ..> Order : uses
+OrderService ..> OrderDTO : uses
+OrderRepository ..> Order : uses
+
+@enduml

@@ -1,0 +1,126 @@
+@startuml
+title Логическая ER-диаграмма — E‑Commerce Platform (модульный монолит)
+
+' === ПОЛЬЗОВАТЕЛИ ===
+entity "users" as users {
+    * id : UUID <<PK>>
+    --
+    email : VARCHAR(255) UNIQUE
+    password_hash : VARCHAR(255)
+    name : VARCHAR(100)
+    role : VARCHAR(20)
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' === ТОВАРЫ ===
+entity "products" as products {
+    * id : UUID <<PK>>
+    --
+    name : VARCHAR(255)
+    description : TEXT
+    price : DECIMAL(10,2)
+    category : VARCHAR(100)
+    stock : INTEGER
+    image_url : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' === КОРЗИНА ===
+entity "carts" as carts {
+    * id : UUID <<PK>>
+    --
+    user_id : UUID <<FK>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+entity "cart_items" as cart_items {
+    * id : UUID <<PK>>
+    --
+    cart_id : UUID <<FK>>
+    product_id : UUID <<FK>>
+    quantity : INTEGER
+    price : DECIMAL(10,2)
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' === ЗАКАЗЫ ===
+entity "orders" as orders {
+    * id : UUID <<PK>>
+    --
+    user_id : UUID <<FK>>
+    status : VARCHAR(20)
+    total_amount : DECIMAL(10,2)
+    shipping_address : TEXT
+    discount_code : VARCHAR(50)
+    payment_id : UUID <<FK>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+entity "order_items" as order_items {
+    * id : UUID <<PK>>
+    --
+    order_id : UUID <<FK>>
+    product_id : UUID <<FK>>
+    product_name : VARCHAR(255)
+    quantity : INTEGER
+    price : DECIMAL(10,2)
+    total : DECIMAL(10,2) (generated)
+    created_at : TIMESTAMP
+}
+
+' === ПЛАТЕЖИ ===
+entity "payments" as payments {
+    * id : UUID <<PK>>
+    --
+    order_id : UUID <<FK>>
+    amount : DECIMAL(10,2)
+    method : VARCHAR(20)
+    status : VARCHAR(20)
+    transaction_id : VARCHAR(255) UNIQUE
+    external_data : JSONB
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' === СОБЫТИЯ (Event Sourcing) ===
+entity "order_events" as order_events {
+    * id : BIGSERIAL <<PK>>
+    --
+    aggregate_id : UUID <<FK>>
+    event_type : VARCHAR(100)
+    event_data : JSONB
+    event_version : INTEGER
+    created_at : TIMESTAMP
+}
+
+' === САГА ===
+entity "saga_state" as saga_state {
+    * id : UUID <<PK>>
+    --
+    saga_type : VARCHAR(50)
+    status : VARCHAR(20)
+    instruction : JSONB
+    step_results : JSONB
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' === СВЯЗИ ===
+users ||--o{ carts : "user_id"
+carts ||--|{ cart_items : "cart_id"
+products ||--o{ cart_items : "product_id"
+
+users ||--o{ orders : "user_id"
+orders ||--|{ order_items : "order_id"
+products ||--o{ order_items : "product_id"
+
+orders ||--o{ payments : "order_id"
+orders ||--o{ order_events : "aggregate_id"
+orders ||--o{ saga_state : "id"
+
+@enduml

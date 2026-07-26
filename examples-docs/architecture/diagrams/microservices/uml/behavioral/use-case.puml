@@ -1,0 +1,115 @@
+@startuml
+title Диаграмма вариантов использования — E‑Commerce Platform (микросервисы)
+
+' === АКТЁРЫ ===
+actor "Покупатель" as Customer
+actor "Менеджер" as Manager
+actor "Администратор" as Admin
+actor "Система" as System
+actor "Платёжный шлюз" as PaymentGateway
+actor "Сервис доставки" as DeliveryService
+
+' === ГРАНИЦА СИСТЕМЫ ===
+rectangle "E‑Commerce Platform (Микросервисы)" {
+    
+    ' === ВАРИАНТЫ ИСПОЛЬЗОВАНИЯ ДЛЯ ПОКУПАТЕЛЯ ===
+    usecase "Просмотр каталога" as UC1
+    usecase "Управление корзиной" as UC2
+    usecase "Оформление заказа" as UC3
+    usecase "Просмотр статуса заказа" as UC4
+    usecase "Отмена заказа" as UC5
+    usecase "Регистрация" as UC6
+    usecase "Вход в систему" as UC7
+    
+    ' === ВАРИАНТЫ ИСПОЛЬЗОВАНИЯ ДЛЯ МЕНЕДЖЕРА ===
+    usecase "Управление товарами" as UC8
+    usecase "Управление заказами" as UC9
+    usecase "Управление клиентами" as UC10
+    
+    ' === ВАРИАНТЫ ИСПОЛЬЗОВАНИЯ ДЛЯ АДМИНИСТРАТОРА ===
+    usecase "Управление пользователями" as UC11
+    usecase "Управление ролями" as UC12
+    usecase "Мониторинг системы" as UC13
+    usecase "Управление настройками" as UC14
+    
+    ' === СИСТЕМНЫЕ ВАРИАНТЫ ИСПОЛЬЗОВАНИЯ ===
+    usecase "Обработка платежа" as UC15
+    usecase "Резервирование товаров" as UC16
+    usecase "Отправка уведомлений" as UC17
+    usecase "Обработка доставки" as UC18
+    usecase "Аудит событий" as UC19
+    usecase "Обновление проекций (CQRS)" as UC20
+    
+    ' === ВКЛЮЧЕНИЯ ===
+    UC3 ..> UC2 : include
+    UC3 ..> UC15 : include
+    UC3 ..> UC16 : include
+    UC3 ..> UC17 : include
+    UC3 ..> UC18 : include
+    
+    UC5 ..> UC15 : include (компенсация)
+    UC5 ..> UC16 : include (компенсация)
+    UC5 ..> UC17 : include (компенсация)
+    
+    UC7 ..> UC6 : include
+    UC9 ..> UC4 : include
+    UC13 ..> UC19 : include
+    UC20 ..> UC4 : include
+    UC20 ..> UC9 : include
+    
+    ' === РАСШИРЕНИЯ ===
+    UC2 <.. UC3 : extend (оформление заказа из корзины)
+    UC4 <.. UC13 : extend (мониторинг статуса)
+}
+
+' === СВЯЗИ АКТЁРОВ ===
+Customer --> UC1
+Customer --> UC2
+Customer --> UC3
+Customer --> UC4
+Customer --> UC5
+Customer --> UC6
+Customer --> UC7
+
+Manager --> UC8
+Manager --> UC9
+Manager --> UC10
+
+Admin --> UC11
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+
+System --> UC19
+System --> UC20
+
+PaymentGateway --> UC15
+DeliveryService --> UC18
+
+' === ОБОБЩЕНИЯ МЕЖДУ АКТЁРАМИ ===
+Admin -|> Manager : extends
+Manager -|> Customer : extends
+
+' === ПОЯСНЕНИЯ ===
+note right of UC3
+  Оформление заказа:
+  1. Создаёт заказ (Order Service)
+  2. Запускает Saga (платёж → резервирование → уведомление)
+  3. Публикует события в Kafka
+end note
+
+note right of UC15
+  Обработка платежа:
+  - Вызывается через Saga
+  - Использует Payment Service
+  - Интегрируется с внешним платёжным шлюзом
+end note
+
+note right of UC20
+  Обновление проекций:
+  - Строит read-модели для CQRS
+  - Подписывается на события из Kafka
+  - Обновляет Read DB
+end note
+
+@enduml

@@ -1,0 +1,113 @@
+@startuml
+title Диаграмма объектов — Создание заказа (микросервисы)
+
+' === ЭКЗЕМПЛЯРЫ ОБЪЕКТОВ В ПРОЦЕССЕ СОЗДАНИЯ ЗАКАЗА ===
+
+' ---- ORDER SERVICE ----
+object "order:Order" as order_obj {
+    id = "550e8400-e29b-41d4-a716-446655440000"
+    userId = "c6f4b3e0-6b4a-4b1a-8e3c-123456789abc"
+    status = "NEW"
+    totalAmount = 1500.00
+    shippingAddress = "г. Москва, ул. Ленина, д. 1"
+    discountCode = ""
+    paymentId = "null"
+    createdAt = "2026-07-26T10:00:00Z"
+}
+
+object "orderItem1:OrderItem" as item1_obj {
+    id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    productId = "product-111"
+    productName = "Смартфон X"
+    quantity = 1
+    price = 1200.00
+    total = 1200.00
+}
+
+object "orderItem2:OrderItem" as item2_obj {
+    id = "b2c3d4e5-f6g7-8901-bcde-f23456789012"
+    productId = "product-222"
+    productName = "Чехол для смартфона"
+    quantity = 2
+    price = 150.00
+    total = 300.00
+}
+
+object "orderEvent:OrderCreated" as event_obj {
+    aggregateId = "550e8400-e29b-41d4-a716-446655440000"
+    eventType = "OrderCreated"
+    eventData = {"userId":"c6f4b3e0...","items":[...]}
+    eventVersion = 1
+    createdAt = "2026-07-26T10:00:00.001Z"
+}
+
+object "saga:SagaState" as saga_obj {
+    id = "saga-001"
+    sagaType = "CreateOrder"
+    status = "IN_PROGRESS"
+    instruction = {"steps":["payment","reserve","notify"]}
+    stepResults = {"payment":"COMPLETED","reserve":"PENDING"}
+}
+
+' ---- PAYMENT SERVICE ----
+object "payment:Payment" as payment_obj {
+    id = "payment-001"
+    orderId = "550e8400-e29b-41d4-a716-446655440000"
+    amount = 1500.00
+    method = "CARD"
+    status = "SUCCESS"
+    transactionId = "txn-1234567890"
+    externalData = {"authCode":"AUTH-123"}
+    createdAt = "2026-07-26T10:00:05Z"
+}
+
+' ---- INVENTORY SERVICE ----
+object "reservation:Reservation" as reservation_obj {
+    id = "res-001"
+    orderId = "550e8400-e29b-41d4-a716-446655440000"
+    productId = "product-111"
+    quantity = 1
+    status = "ACTIVE"
+    createdAt = "2026-07-26T10:00:10Z"
+}
+
+object "stock:Stock" as stock_obj {
+    id = "stock-001"
+    productId = "product-111"
+    quantity = 100
+    reserved = 1
+    updatedAt = "2026-07-26T10:00:10Z"
+}
+
+' ---- USER SERVICE ----
+object "user:User" as user_obj {
+    id = "c6f4b3e0-6b4a-4b1a-8e3c-123456789abc"
+    email = "customer@example.com"
+    name = "Иван Петров"
+    role = "user"
+    createdAt = "2026-01-15T09:00:00Z"
+}
+
+' ---- NOTIFICATION SERVICE ----
+object "notification:Notification" as notification_obj {
+    id = "notif-001"
+    userId = "c6f4b3e0-6b4a-4b1a-8e3c-123456789abc"
+    type = "ORDER_CONFIRMATION"
+    channel = "EMAIL"
+    status = "PENDING"
+    content = {"orderId":"550e8400...", "total":1500}
+    createdAt = "2026-07-26T10:00:15Z"
+}
+
+' === СВЯЗИ МЕЖДУ ОБЪЕКТАМИ ===
+order_obj *-- item1_obj : contains
+order_obj *-- item2_obj : contains
+order_obj ..> event_obj : generates
+order_obj ..> saga_obj : managed by
+
+order_obj ..> payment_obj : references (via paymentId)
+order_obj ..> reservation_obj : references (via orderId)
+order_obj ..> user_obj : references (via userId)
+order_obj ..> notification_obj : references (via userId)
+
+@enduml

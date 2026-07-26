@@ -1,0 +1,41 @@
+@startuml
+title Диаграмма коммуникации — создание заказа
+
+actor Customer
+participant "Web UI" as UI
+participant "API Gateway" as Gateway
+participant "Order Service" as Order
+participant "Payment Service" as Payment
+participant "Inventory Service" as Inventory
+participant "Notification Service" as Notification
+participant "Kafka" as Kafka
+database "PostgreSQL" as DB
+
+Customer --> UI : 1. Оформление заказа
+UI --> Gateway : 2. POST /orders
+Gateway --> Order : 3. CreateOrder
+
+Order --> DB : 4. Сохранить заказ (NEW)
+DB --> Order : 5. OK
+
+Order --> Payment : 6. ProcessPayment
+Payment --> Kafka : 7. Публикация PaymentInitiated
+Payment --> Order : 8. OK
+
+Order --> Inventory : 9. ReserveStock
+Inventory --> Kafka : 10. Публикация InventoryReserved
+Inventory --> Order : 11. OK
+
+Order --> Notification : 12. SendNotification
+Notification --> Kafka : 13. Публикация NotificationSent
+Notification --> Order : 14. OK
+
+Order --> DB : 15. Обновить статус заказа (PAID)
+DB --> Order : 16. OK
+
+Order --> Kafka : 17. Публикация OrderCreated
+Order --> Gateway : 18. Order created
+Gateway --> UI : 19. 202 Accepted
+UI --> Customer : 20. Заказ создан
+
+@enduml

@@ -1,0 +1,47 @@
+@startuml
+title Концептуальная ER-диаграмма — E‑Commerce Platform (микросервисы)
+
+' === БАУНДЫ СЕРВИСОВ ===
+package "Order Service" {
+    entity "Заказ" as order
+    entity "Позиция заказа" as order_item
+    entity "Событие заказа" as order_event
+    entity "Сага" as saga
+}
+
+package "Payment Service" {
+    entity "Платёж" as payment
+}
+
+package "Inventory Service" {
+    entity "Товар" as product
+    entity "Остаток" as stock
+    entity "Резервирование" as reservation
+}
+
+package "User Service" {
+    entity "Пользователь" as user
+}
+
+package "Notification Service" {
+    entity "Уведомление" as notification
+}
+
+' === СВЯЗИ МЕЖДУ СЕРВИСАМИ (ЛОГИЧЕСКИЕ) ===
+order ||--o{ payment : "имеет (через событие OrderPaid)"
+order ||--o{ reservation : "требует (через событие OrderCreated)"
+user ||--o{ order : "создаёт (через событие UserCreated)"
+
+' === СВЯЗИ ВНУТРИ СЕРВИСОВ ===
+order ||--|{ order_item : "содержит"
+order ||--o{ order_event : "порождает"
+order ||--o{ saga : "управляется"
+
+payment ||--o{ order : "ссылается на"
+
+product ||--o{ stock : "имеет"
+stock ||--o{ reservation : "участвует в"
+
+user ||--o{ order : "создаёт"
+
+@enduml

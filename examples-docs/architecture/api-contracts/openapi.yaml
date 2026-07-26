@@ -1,0 +1,691 @@
+openapi: 3.0.0
+info:
+  title: E‑Commerce Platform API
+  version: 1.0.0
+  description: |
+    REST API для E‑Commerce платформы.
+    Поддерживает каталог товаров, корзину, заказы, платежи и управление пользователями.
+    Использует JWT-аутентификацию (Bearer token).
+servers:
+  - url: https://api.ecommerce.example.com/v1
+    description: Production server
+  - url: https://staging-api.ecommerce.example.com/v1
+    description: Staging server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ===== Products =====
+  /products:
+    get:
+      summary: Получить список товаров
+      description: Поддерживает пагинацию, фильтрацию по категории, поиск по названию
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Фильтр по категории
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Поиск по названию товара
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Количество товаров на страницу
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Смещение для пагинации
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  total:
+                    type: integer
+                    description: Общее количество товаров, удовлетворяющих фильтрам
+        '400':
+          description: Неверные параметры запроса
+
+    post:
+      summary: Создать новый товар (администратор)
+      security:
+        - bearerAuth: ['admin']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        '201':
+          description: Товар создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '403':
+          description: Недостаточно прав
+
+  /products/{productId}:
+    get:
+      summary: Получить товар по ID
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Товар найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Товар не найден
+
+  # ===== Cart =====
+  /cart:
+    get:
+      summary: Получить текущую корзину пользователя
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Корзина пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '401':
+          description: Не авторизован
+
+    post:
+      summary: Добавить товар в корзину
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddToCartRequest'
+      responses:
+        '200':
+          description: Товар добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '400':
+          description: Неверный запрос
+
+  /cart/items/{cartItemId}:
+    delete:
+      summary: Удалить товар из корзины
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cartItemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Товар удалён
+        '404':
+          description: Товар не найден в корзине
+
+  /cart/items/{cartItemId}/quantity:
+    put:
+      summary: Изменить количество товара в корзине
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cartItemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Количество обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '400':
+          description: Неверное количество
+
+  # ===== Orders =====
+  /orders:
+    post:
+      summary: Создать заказ из корзины
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '202':
+          description: Заказ принят в обработку (асинхронная Saga)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Ошибка валидации
+
+    get:
+      summary: Получить список заказов пользователя
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [NEW, PAID, SHIPPED, DELIVERED, CANCELLED]
+          description: Фильтр по статусу
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Количество заказов
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Смещение
+      responses:
+        '200':
+          description: Список заказов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  total:
+                    type: integer
+
+  /orders/{orderId}:
+    get:
+      summary: Получить заказ по ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Заказ найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Заказ не найден
+
+    put:
+      summary: Отменить заказ (если статус позволяет)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Заказ отменён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Невозможно отменить заказ в текущем статусе
+
+  # ===== Payments =====
+  /payments:
+    post:
+      summary: Инициировать платёж для заказа
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiatePaymentRequest'
+      responses:
+        '202':
+          description: Платёж инициирован (асинхронная обработка)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          description: Ошибка валидации
+
+  /payments/{paymentId}/status:
+    get:
+      summary: Получить статус платежа
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Статус платежа
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paymentId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [PENDING, SUCCESS, FAILED, REFUNDED]
+                  message:
+                    type: string
+        '404':
+          description: Платёж не найден
+
+  # ===== Users =====
+  /users/register:
+    post:
+      summary: Регистрация нового пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterUserRequest'
+      responses:
+        '201':
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Ошибка валидации (например, email уже занят)
+
+  /users/login:
+    post:
+      summary: Аутентификация пользователя (JWT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Неверные учётные данные
+
+  /users/me:
+    get:
+      summary: Получить профиль текущего пользователя
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Не авторизован
+
+  /users/me/orders:
+    get:
+      summary: Получить заказы текущего пользователя (аналог /orders с фильтром по пользователю)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [NEW, PAID, SHIPPED, DELIVERED, CANCELLED]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Список заказов пользователя
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  total:
+                    type: integer
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT-токен, полученный при входе
+
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+        category:
+          type: string
+        stock:
+          type: integer
+        imageUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateProductRequest:
+      type: object
+      required:
+        - name
+        - price
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+        category:
+          type: string
+        stock:
+          type: integer
+        imageUrl:
+          type: string
+
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        productName:
+          type: string
+        price:
+          type: number
+          format: double
+        quantity:
+          type: integer
+        total:
+          type: number
+          format: double
+
+    Cart:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        totalAmount:
+          type: number
+          format: double
+
+    AddToCartRequest:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        productName:
+          type: string
+        quantity:
+          type: integer
+        price:
+          type: number
+          format: double
+        total:
+          type: number
+          format: double
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [NEW, PAID, SHIPPED, DELIVERED, CANCELLED]
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        totalAmount:
+          type: number
+          format: double
+        paymentId:
+          type: string
+          format: uuid
+        shippingAddress:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - shippingAddress
+      properties:
+        shippingAddress:
+          type: string
+        discountCode:
+          type: string
+
+    InitiatePaymentRequest:
+      type: object
+      required:
+        - orderId
+        - paymentMethod
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        paymentMethod:
+          type: string
+          enum: [CARD, SBP, PAYPAL]
+        cardToken:
+          type: string
+          description: Токен карты для CARD
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        method:
+          type: string
+          enum: [CARD, SBP, PAYPAL]
+        status:
+          type: string
+          enum: [PENDING, SUCCESS, FAILED, REFUNDED]
+        transactionId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, manager, admin]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RegisterUserRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string

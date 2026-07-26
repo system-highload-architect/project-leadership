@@ -1,0 +1,40 @@
+@startuml
+title Диаграмма вариантов использования — E‑Commerce Platform
+
+left to right direction
+actor "Покупатель" as Customer
+actor "Менеджер" as Manager
+actor "Администратор" as Admin
+actor "Система" as System
+
+rectangle "E‑Commerce Platform" {
+  usecase "Просмотр каталога" as UC1
+  usecase "Управление корзиной" as UC2
+  usecase "Оформление заказа" as UC3
+  usecase "Оплата заказа" as UC4
+  usecase "Управление товарами" as UC5
+  usecase "Управление заказами" as UC6
+  usecase "Управление пользователями" as UC7
+  usecase "Аутентификация" as UC8
+  usecase "Уведомления" as UC9
+  usecase "Обработка платежа" as UC10
+  usecase "Резервирование товаров" as UC11
+}
+
+Customer --> UC1
+Customer --> UC2
+Customer --> UC3
+Customer --> UC4
+Manager --> UC5
+Manager --> UC6
+Admin --> UC7
+System --> UC10
+System --> UC11
+System --> UC9
+
+UC3 ..> UC8 : <<include>>
+UC4 ..> UC10 : <<include>>
+UC3 ..> UC11 : <<include>>
+UC3 ..> UC9 : <<include>>
+
+@enduml

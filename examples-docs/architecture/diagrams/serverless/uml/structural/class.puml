@@ -1,0 +1,80 @@
+@startuml
+title Диаграмма классов — Serverless Function (Notification)
+
+class NotificationEvent {
+  - EventID: UUID
+  - OrderID: UUID
+  - CustomerID: UUID
+  - Type: string
+  - Payload: JSON
+  - Timestamp: time.Time
+}
+
+class Notification {
+  - ID: UUID
+  - UserID: UUID
+  - Type: NotificationType
+  - Channel: NotificationChannel
+  - Status: NotificationStatus
+  - Content: string
+  - CreatedAt: time.Time
+  - SentAt: time.Time
+}
+
+enum NotificationType {
+  ORDER_CONFIRMATION
+  ORDER_CANCELLATION
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  DELIVERY_UPDATE
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+interface NotificationSender {
+  + Send(notification: Notification): error
+}
+
+class EmailAdapter {
+  + Send(notification: Notification): error
+}
+
+class SMSAdapter {
+  + Send(notification: Notification): error
+}
+
+class PushAdapter {
+  + Send(notification: Notification): error
+}
+
+class NotificationHandler {
+  - sender: NotificationSender
+  + Handle(event: NotificationEvent): error
+}
+
+class NotificationRepository {
+  + Save(notification: Notification): error
+  + FindByID(id: UUID): Notification
+  + FindByUser(userID: UUID): []Notification
+}
+
+NotificationHandler --> NotificationSender : uses
+NotificationHandler --> NotificationRepository : uses
+
+EmailAdapter ..|> NotificationSender : implements
+SMSAdapter ..|> NotificationSender : implements
+PushAdapter ..|> NotificationSender : implements
+
+Notification "1" -- "1" NotificationEvent : processed from
+
+@enduml

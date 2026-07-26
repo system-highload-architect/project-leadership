@@ -1,0 +1,102 @@
+@startuml
+title Диаграмма последовательности — Создание заказа (микросервисы + Saga)
+
+actor "Покупатель" as Customer
+participant "Web UI" as UI
+participant "API Gateway" as Gateway
+participant "Order Service (Saga Orchestrator)" as Order
+participant "Payment Service" as Payment
+participant "Inventory Service" as Inventory
+participant "Notification Service" as Notification
+participant "Kafka" as Kafka
+participant "Платёжный шлюз" as PaymentGateway
+
+' === ШАГ 1: ПОЛЬЗОВАТЕЛЬ ОФОРМЛЯЕТ ЗАКАЗ ===
+Customer -> UI : Оформляет заказ
+UI -> Gateway : POST /orders
+activate Gateway
+
+Gateway -> Order : CreateOrder (gRPC)
+activate Order
+
+' === ШАГ 2: АГРЕГАТ И СОБЫТИЯ ===
+Order -> Order : CreateOrderUseCase.Execute()
+Order -> Order : Создаёт агрегат Order (статус NEW)
+Order -> Order : Сохраняет событие OrderCreated в Event Store
+
+' === ШАГ 3: ПУБЛИКАЦИЯ СОБЫТИЯ ===
+Order -> Kafka : Публикует OrderCreated (для аудита и проекций)
+Kafka --> Order : Ack
+
+' === ШАГ 4: SAGA ШАГ 1 — ПЛАТЁЖ ===
+Order -> Payment : ProcessPayment (Saga шаг 1)
+activate Payment
+
+Payment -> Payment : Создаёт платёж (статус PENDING)
+Payment -> PaymentGateway : Authorize payment
+activate PaymentGateway
+PaymentGateway --> Payment : Payment success
+deactivate PaymentGateway
+
+Payment -> Payment : Обновляет статус платежа на SUCCESS
+Payment -> Kafka : Публикует PaymentCompleted
+Payment --> Order : Payment completed
+deactivate Payment
+
+' === ШАГ 5: SAGA ШАГ 2 — РЕЗЕРВИРОВАНИЕ ===
+Order -> Inventory : ReserveStock (Saga шаг 2)
+activate Inventory
+
+Inventory -> Inventory : Проверяет остатки
+Inventory -> Inventory : Резервирует товары
+Inventory -> Kafka : Публикует InventoryReserved
+Inventory --> Order : Stock reserved
+deactivate Inventory
+
+' === ШАГ 6: SAGA ШАГ 3 — УВЕДОМЛЕНИЕ ===
+Order -> Notification : SendOrderConfirmation (Saga шаг 3)
+activate Notification
+
+Notification -> Notification : Формирует уведомление
+Notification -> Kafka : Публикует NotificationRequest
+Notification --> Order : Notification sent
+deactivate Notification
+
+' === ШАГ 7: ОБНОВЛЕНИЕ СТАТУСА ЗАКАЗА ===
+Order -> Order : Обновляет статус заказа на PAID
+Order -> Kafka : Публикует OrderPaid (событие)
+Order --> Gateway : Order created (ID, статус)
+deactivate Order
+
+Gateway --> UI : 202 Accepted (Order ID)
+deactivate Gateway
+
+UI --> Customer : Заказ создан, ожидайте подтверждения
+
+' === ШАГ 8: ПАРАЛЛЕЛЬНЫЕ ПОДПИСЧИКИ ===
+Kafka -> Notification : Доставляет OrderCreated
+activate Notification
+Notification -> Notification : Отправляет дополнительное уведомление
+deactivate Notification
+
+Kafka -> Analytics : Доставляет OrderCreated
+activate Analytics
+Analytics -> Analytics : Обрабатывает событие для отчётов
+deactivate Analytics
+
+note right of Order
+  Saga Orchestrator:
+  - Управляет шагами (4, 5, 6)
+  - Сохраняет состояние Saga в БД
+  - При ошибке запускает компенсацию
+  - Обеспечивает eventual consistency
+end note
+
+note right of Payment
+  Payment Service:
+  - Обрабатывает платежи через внешний шлюз
+  - Публикует PaymentCompleted/PaymentFailed
+  - Участвует в Saga
+end note
+
+@enduml

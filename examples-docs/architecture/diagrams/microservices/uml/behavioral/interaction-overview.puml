@@ -1,0 +1,38 @@
+@startuml
+title Диаграмма обзора взаимодействия — Создание заказа (микросервисы)
+
+start
+
+:Покупатель оформляет заказ;
+
+partition "Order Service" {
+    :Создание заказа;
+    :Сохранение OrderCreated в Event Store;
+    :Публикация OrderCreated в Kafka;
+}
+
+partition "Saga Orchestrator" {
+    :Шаг 1: ProcessPayment (Payment Service);
+    if (Платёж успешен?) then (Да)
+        :Шаг 2: ReserveStock (Inventory Service);
+        if (Резервирование успешно?) then (Да)
+            :Шаг 3: SendNotification (Notification Service);
+        else (Нет)
+            :Компенсация (отмена заказа, возврат платежа, освобождение товаров);
+        endif
+    else (Нет)
+        :Компенсация (отмена заказа, возврат платежа);
+    endif
+}
+
+partition "Параллельные подписчики" {
+    :Проекция (CQRS) обновляет Read DB;
+    :Аналитика получает событие;
+    :Дополнительные уведомления;
+}
+
+:Покупатель видит подтверждение заказа;
+
+stop
+
+@enduml

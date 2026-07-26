@@ -1,0 +1,30 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+LAYOUT_WITH_LEGEND()
+title Динамическая диаграмма — Обработка заказа (Serverless)
+
+Person(customer, "Покупатель")
+System_Ext(web_ui, "Web UI")
+System_Ext(api_gateway, "API Gateway")
+System_Ext(order_service, "Order Service")
+System_Ext(kafka, "Kafka")
+System_Ext(notification_function, "Notification Function")
+System_Ext(email_service, "Email Service")
+
+Rel(customer, web_ui, "1. Оформляет заказ", "HTTPS")
+Rel(web_ui, api_gateway, "2. POST /orders", "HTTPS")
+Rel(api_gateway, order_service, "3. CreateOrder", "gRPC")
+
+Rel(order_service, order_service, "4. Создаёт заказ (NEW)")
+Rel(order_service, kafka, "5. Публикует OrderCreated", "Kafka")
+
+Rel(kafka, notification_function, "6. Триггерит функцию", "Kafka")
+Rel(notification_function, email_service, "7. Отправляет email", "SMTP")
+Rel(email_service, customer, "8. Подтверждение заказа", "Email")
+
+Rel(order_service, api_gateway, "9. Order created (async)", "gRPC")
+Rel(api_gateway, web_ui, "10. 202 Accepted", "HTTPS")
+Rel(web_ui, customer, "11. Заказ создан", "HTTPS")
+
+@enduml

@@ -1,0 +1,61 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+LAYOUT_WITH_LEGEND()
+title Диаграмма развёртывания — E‑Commerce Platform (Serverless)
+
+Deployment_Node(k8s_cluster, "Kubernetes Cluster") {
+    Deployment_Node(ingress_node, "Ingress", "Nginx")
+    Deployment_Node(gateway_node, "API Gateway", "Go")
+    Deployment_Node(services_node, "Microservices") {
+        Container(order_service, "Order Service", "Go")
+        Container(payment_service, "Payment Service", "Go")
+        Container(inventory_service, "Inventory Service", "Go")
+    }
+    Deployment_Node(db_node, "Databases") {
+        ContainerDb(order_db, "Order DB", "PostgreSQL")
+        ContainerDb(order_read_db, "Order Read DB", "PostgreSQL")
+        ContainerDb(payment_db, "Payment DB", "PostgreSQL")
+        ContainerDb(inventory_db, "Inventory DB", "PostgreSQL")
+    }
+    Deployment_Node(kafka_node, "Kafka", "Kafka")
+}
+
+Deployment_Node(aws_cloud, "AWS Cloud") {
+    Deployment_Node(lambda, "AWS Lambda") {
+        Container(notification_function, "Notification Function", "Go")
+        Container(report_function, "Report Function", "Python")
+        Container(export_function, "Export Function", "Go")
+    }
+    Deployment_Node(s3, "S3") {
+        ContainerDb(report_db, "Report Storage", "S3")
+    }
+}
+
+Deployment_Node(external, "External Systems") {
+    System_Ext(payment_gateway, "Payment Gateway")
+    System_Ext(delivery_service, "Delivery Service")
+    System_Ext(email_service, "Email Service")
+}
+
+Rel(ingress_node, gateway_node, "Маршрутизирует", "HTTPS")
+Rel(gateway_node, services_node, "Маршрутизирует", "gRPC")
+
+Rel(services_node, kafka_node, "Публикует события", "Kafka")
+Rel(kafka_node, lambda, "Триггерит функции", "Kafka")
+
+Rel(notification_function, email_service, "Отправляет", "SMTP")
+Rel(report_function, s3, "Сохраняет отчёты", "S3 API")
+
+Rel(payment_service, payment_gateway, "Обрабатывает платежи", "HTTPS")
+Rel(order_service, delivery_service, "Создаёт заявки", "HTTP")
+
+note right of lambda
+  Serverless функции:
+  - Масштабируются автоматически
+  - Оплата за выполнение
+  - Холодный старт
+  - Ограниченное время выполнения (15 мин)
+end note
+
+@enduml

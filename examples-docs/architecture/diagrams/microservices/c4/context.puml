@@ -1,0 +1,60 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+title Контекстная диаграмма — E‑Commerce Platform (микросервисы)
+
+' === ПОЛЬЗОВАТЕЛИ ===
+Person(customer, "Покупатель", "Просматривает каталог, оформляет заказы, оплачивает")
+Person(manager, "Менеджер", "Управляет товарами, заказами, клиентами")
+Person(admin, "Администратор", "Управляет пользователями, настройками, мониторит систему")
+
+' === ГРАНИЦА СИСТЕМЫ ===
+System_Boundary(ecommerce, "E‑Commerce Platform (Микросервисы)") {
+    System(api_gateway, "API Gateway", "Единая точка входа, маршрутизация, аутентификация")
+    System(order_service, "Order Service", "Управление заказами (Event Sourcing + CQRS)")
+    System(payment_service, "Payment Service", "Управление платежами (Saga)")
+    System(inventory_service, "Inventory Service", "Управление товарами и остатками")
+    System(user_service, "User Service", "Управление пользователями и аутентификацией")
+    System(notification_service, "Notification Service", "Отправка уведомлений")
+    System(kafka, "Kafka", "Брокер событий (межсервисная коммуникация)")
+}
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+System_Ext(payment_gateway, "Платёжный шлюз", "Обработка платежей")
+System_Ext(delivery_service, "Сервис доставки", "Расчёт стоимости, отслеживание")
+System_Ext(analytics, "Система аналитики", "Сбор данных для отчётов")
+
+' === СВЯЗИ ПОЛЬЗОВАТЕЛЕЙ ===
+Rel(customer, api_gateway, "Использует", "HTTPS")
+Rel(manager, api_gateway, "Использует", "HTTPS")
+Rel(admin, api_gateway, "Использует", "HTTPS")
+
+' === СВЯЗИ МЕЖДУ СЕРВИСАМИ ===
+Rel(api_gateway, order_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, payment_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, user_service, "Маршрутизирует", "gRPC")
+
+Rel(order_service, payment_service, "Saga шаг: платёж", "gRPC/события")
+Rel(order_service, inventory_service, "Резервирование товаров", "gRPC/события")
+Rel(order_service, notification_service, "Уведомления", "события")
+Rel(payment_service, payment_gateway, "Обработка платежей", "HTTPS/REST")
+Rel(inventory_service, analytics, "Отправка событий", "Kafka")
+
+' === ПОЯСНЕНИЯ ===
+note right of order_service
+  Order Service:
+  - Event Sourcing + CQRS
+  - Saga Orchestrator для создания заказа
+  - Хранит события в Event Store
+  - Строит read-модели (проекции)
+end note
+
+note right of payment_service
+  Payment Service:
+  - Обрабатывает платежи
+  - Участвует в Saga (оркестрация)
+  - Хранит историю платежей
+end note
+
+@enduml

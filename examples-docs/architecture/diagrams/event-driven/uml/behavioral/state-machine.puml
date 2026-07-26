@@ -1,0 +1,57 @@
+@startuml
+title Диаграмма состояний — Жизненный цикл заказа (Event‑Driven)
+
+[*] --> NEW : OrderCreated (событие)
+
+state NEW {
+    [*] --> AwaitingPayment : Ожидание платежа
+    AwaitingPayment --> PaymentTimeout : Таймаут
+    AwaitingPayment --> PaymentReceived : PaymentCompleted (событие)
+}
+
+NEW --> CANCELLED : OrderCancelled (компенсация)
+NEW --> PAID : PaymentReceived
+
+state PAID {
+    [*] --> AwaitingReserve : Ожидание резервирования
+    AwaitingReserve --> ReserveTimeout : Таймаут
+    AwaitingReserve --> StockReserved : InventoryReserved (событие)
+}
+
+PAID --> CANCELLED : OrderCancelled (компенсация)
+PAID --> SHIPPED : OrderShipped (событие)
+
+state SHIPPED {
+    [*] --> InTransit : В пути
+    InTransit --> Delivered : DeliveryCompleted (событие)
+    InTransit --> DeliveryFailed : Ошибка доставки
+}
+
+SHIPPED --> DELIVERED : Delivered
+SHIPPED --> CANCELLED : OrderCancelled (компенсация)
+
+state DELIVERED {
+    [*] --> Completed : Заказ выполнен
+    Completed --> [*] : Завершён
+}
+
+state CANCELLED {
+    [*] --> RefundPending : Ожидание возврата
+    RefundPending --> RefundCompleted : Возврат выполнен
+    RefundCompleted --> [*] : Заказ отменён
+}
+
+' === СОБЫТИЯ ===
+NEW --> PAID : PaymentCompleted (от Payment Service)
+PAID --> SHIPPED : OrderShipped (от Delivery Service)
+SHIPPED --> DELIVERED : DeliveryCompleted (от Delivery Service)
+
+' === КОМПЕНСАЦИЯ ===
+PAID --> CANCELLED : OrderCancelled (компенсация)
+SHIPPED --> CANCELLED : OrderCancelled (компенсация)
+
+' === ТАЙМАУТЫ ===
+NEW --> CANCELLED : PaymentTimeout
+PAID --> CANCELLED : ReserveTimeout
+
+@enduml

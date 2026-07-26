@@ -1,0 +1,72 @@
+@startuml
+title Диаграмма состояний — Жизненный цикл заказа (микросервисы)
+
+' === НАЧАЛО ===
+[*] --> NEW : Заказ создан (OrderCreated)
+
+' === СОСТОЯНИЕ NEW ===
+state NEW {
+    [*] --> AwaitingPayment : Ожидание платежа
+    AwaitingPayment --> PaymentTimeout : Таймаут платежа
+    AwaitmentPayment --> PaymentReceived : Платёж успешен (PaymentCompleted)
+}
+
+' === ПЕРЕХОДЫ ИЗ NEW ===
+NEW --> CANCELLED : Отмена заказа (до оплаты)
+NEW --> PAID : PaymentReceived
+
+' === СОСТОЯНИЕ PAID ===
+state PAID {
+    [*] --> AwaitingReserve : Ожидание резервирования товаров
+    AwaitingReserve --> ReserveTimeout : Таймаут резервирования
+    AwaitingReserve --> StockReserved : Товары зарезервированы (InventoryReserved)
+}
+
+PAID --> CANCELLED : Отмена заказа (после оплаты, с возвратом)
+PAID --> SHIPPED : Заказ отгружен (OrderShipped)
+
+' === СОСТОЯНИЕ SHIPPED ===
+state SHIPPED {
+    [*] --> InTransit : В пути
+    InTransit --> Delivered : Доставлен (DeliveryCompleted)
+    InTransit --> DeliveryFailed : Ошибка доставки
+}
+
+SHIPPED --> DELIVERED : Доставлен
+SHIPPED --> CANCELLED : Отмена в пути (редко, с возвратом)
+
+' === СОСТОЯНИЕ DELIVERED ===
+state DELIVERED {
+    [*] --> Completed : Заказ выполнен
+    Completed --> [*] : Завершён
+}
+
+' === СОСТОЯНИЕ CANCELLED ===
+state CANCELLED {
+    [*] --> RefundPending : Ожидание возврата средств
+    RefundPending --> RefundCompleted : Возврат выполнен
+    RefundCompleted --> [*] : Заказ отменён
+}
+
+' === КОМПЕНСАЦИЯ (Saga) ===
+note right of CANCELLED
+  Saga компенсация при отмене:
+  1. Отмена заказа (OrderCancelled)
+  2. Возврат платежа (PaymentRefunded)
+  3. Освобождение товаров (StockReleased)
+  4. Уведомление клиента (NotificationSent)
+end note
+
+' === СОБЫТИЯ ===
+NEW --> PAID : PaymentCompleted (событие от Payment Service)
+PAID --> SHIPPED : OrderShipped (событие от Delivery Service)
+SHIPPED --> DELIVERED : DeliveryCompleted (событие от Delivery Service)
+
+PAID --> CANCELLED : OrderCancelled (компенсация)
+SHIPPED --> CANCELLED : OrderCancelled (компенсация)
+
+' === ТАЙМАУТЫ ===
+NEW --> CANCELLED : PaymentTimeout (Saga компенсация)
+PAID --> CANCELLED : ReserveTimeout (Saga компенсация)
+
+@enduml

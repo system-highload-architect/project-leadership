@@ -1,0 +1,71 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+title Диаграмма контейнеров — E‑Commerce Platform (Serverless)
+
+Person(customer, "Покупатель")
+Person(manager, "Менеджер")
+Person(admin, "Администратор")
+
+System_Boundary(ecommerce, "E‑Commerce Platform (Serverless)") {
+    
+    Container(api_gateway, "API Gateway", "Go + Gin", "Единая точка входа")
+    
+    Container(order_service, "Order Service", "Go", "Микросервис (контейнер)")
+    Container(payment_service, "Payment Service", "Go", "Микросервис (контейнер)")
+    Container(inventory_service, "Inventory Service", "Go", "Микросервис (контейнер)")
+    
+    Container(kafka, "Kafka", "Apache Kafka", "Брокер событий")
+    
+    Container(notification_function, "Notification Function", "AWS Lambda / Go", "Отправка уведомлений")
+    Container(report_function, "Report Function", "AWS Lambda / Python", "Генерация отчётов")
+    Container(export_function, "Export Function", "AWS Lambda / Go", "Экспорт данных")
+    
+    ContainerDb(order_db, "Order DB", "PostgreSQL", "Write + Event Store")
+    ContainerDb(order_read_db, "Order Read DB", "PostgreSQL", "Read DB")
+    ContainerDb(payment_db, "Payment DB", "PostgreSQL", "Платежи")
+    ContainerDb(inventory_db, "Inventory DB", "PostgreSQL", "Товары")
+    ContainerDb(report_db, "Report DB", "S3 / Athena", "Хранилище отчётов")
+}
+
+System_Ext(payment_gateway, "Платёжный шлюз")
+System_Ext(delivery_service, "Сервис доставки")
+System_Ext(email_service, "Email Service", "SendGrid / SES")
+
+Rel(customer, api_gateway, "Использует", "HTTPS")
+Rel(manager, api_gateway, "Использует", "HTTPS")
+Rel(admin, api_gateway, "Использует", "HTTPS")
+
+Rel(api_gateway, order_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, payment_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, inventory_service, "Маршрутизирует", "gRPC")
+
+Rel(order_service, kafka, "Публикует события", "Kafka")
+Rel(payment_service, kafka, "Публикует события", "Kafka")
+Rel(inventory_service, kafka, "Публикует события", "Kafka")
+
+Rel(kafka, notification_function, "Триггерит", "Kafka")
+Rel(kafka, report_function, "Триггерит", "Kafka")
+Rel(kafka, export_function, "Триггерит", "Kafka")
+
+Rel(notification_function, email_service, "Отправляет", "SMTP/HTTP")
+
+Rel(order_service, order_db, "Читает/пишет", "SQL")
+Rel(order_service, order_read_db, "Читает", "SQL")
+Rel(payment_service, payment_db, "Читает/пишет", "SQL")
+Rel(inventory_service, inventory_db, "Читает/пишет", "SQL")
+Rel(report_function, report_db, "Записывает отчёты", "S3 API")
+
+Rel(payment_service, payment_gateway, "Обрабатывает платежи", "HTTPS")
+Rel(order_service, delivery_service, "Создаёт заявки", "HTTP")
+
+note right of notification_function
+  Serverless функции:
+  - Масштабируются автоматически
+  - Оплата за выполнение
+  - Быстрый старт (cold start)
+  - Ограниченное время выполнения
+end note
+
+@enduml

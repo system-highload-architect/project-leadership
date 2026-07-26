@@ -1,0 +1,138 @@
+@startuml
+title Диаграмма компонентов — E‑Commerce Platform (микросервисы)
+
+' === API GATEWAY ===
+component "API Gateway" as gateway {
+    [HTTP Router]
+    [Auth Middleware]
+    [Rate Limiter]
+    [gRPC Gateway]
+}
+
+' === ORDER SERVICE ===
+component "Order Service" as order {
+    [Delivery Layer]
+    [Use Cases]
+    [Domain]
+    [Event Sourcing]
+    [Projection Service]
+    [Saga Orchestrator]
+}
+
+interface "IOrderService" as IOrderService
+interface "IOrderEvents" as IOrderEvents
+interface "ISagaCoordinator" as ISagaCoordinator
+
+order --> IOrderService : provides
+order --> IOrderEvents : provides
+order --> ISagaCoordinator : provides
+
+' === PAYMENT SERVICE ===
+component "Payment Service" as payment {
+    [Delivery Layer]
+    [Use Cases]
+    [Domain]
+    [Payment Gateway Adapter]
+}
+
+interface "IPaymentService" as IPaymentService
+interface "IPaymentEvents" as IPaymentEvents
+
+payment --> IPaymentService : provides
+payment --> IPaymentEvents : provides
+
+' === INVENTORY SERVICE ===
+component "Inventory Service" as inventory {
+    [Delivery Layer]
+    [Use Cases]
+    [Domain]
+    [Stock Manager]
+    [Reservation Manager]
+}
+
+interface "IInventoryService" as IInventoryService
+interface "IInventoryEvents" as IInventoryEvents
+
+inventory --> IInventoryService : provides
+inventory --> IInventoryEvents : provides
+
+' === USER SERVICE ===
+component "User Service" as user {
+    [Delivery Layer]
+    [Use Cases]
+    [Domain]
+    [Authentication]
+}
+
+interface "IUserService" as IUserService
+
+user --> IUserService : provides
+
+' === NOTIFICATION SERVICE ===
+component "Notification Service" as notification {
+    [Delivery Layer]
+    [Use Cases]
+    [Domain]
+    [Channel Adapters]
+}
+
+interface "INotificationService" as INotificationService
+interface "INotificationEvents" as INotificationEvents
+
+notification --> INotificationService : provides
+notification --> INotificationEvents : provides
+
+' === ВНЕШНИЕ КОМПОНЕНТЫ ===
+component "Kafka" as kafka
+component "PostgreSQL (Order DB)" as order_db
+component "PostgreSQL (Payment DB)" as payment_db
+component "PostgreSQL (Inventory DB)" as inventory_db
+component "PostgreSQL (User DB)" as user_db
+component "PostgreSQL (Notification DB)" as notification_db
+component "Redis" as redis
+component "Payment Gateway (External)" as payment_gateway
+component "Delivery Service (External)" as delivery_service
+
+' === ЗАВИСИМОСТИ ===
+gateway --> IOrderService : requires
+gateway --> IPaymentService : requires
+gateway --> IUserService : requires
+
+order --> IPaymentService : requires (Saga)
+order --> IInventoryService : requires (Saga)
+order --> INotificationService : requires (Saga)
+
+order --> order_db : uses (SQL)
+payment --> payment_db : uses (SQL)
+inventory --> inventory_db : uses (SQL)
+user --> user_db : uses (SQL)
+notification --> notification_db : uses (SQL)
+
+order --> redis : uses (cache)
+inventory --> redis : uses (cache)
+
+order --> kafka : publishes/subscribes
+payment --> kafka : publishes/subscribes
+inventory --> kafka : publishes/subscribes
+notification --> kafka : subscribes
+
+payment --> payment_gateway : uses (HTTPS)
+order --> delivery_service : uses (HTTPS)
+
+' === ПОЯСНЕНИЯ ===
+note right of order
+  Order Service:
+  - Uses Event Sourcing + CQRS
+  - Saga Orchestrator
+  - Publishes events to Kafka
+end note
+
+note right of kafka
+  Kafka topics:
+  - orders
+  - payments
+  - inventory
+  - notifications
+end note
+
+@enduml

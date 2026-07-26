@@ -1,0 +1,134 @@
+@startuml
+title Логическая ER-диаграмма — E‑Commerce Platform (микросервисы)
+
+' ===== ORDER SERVICE =====
+entity "orders" as orders {
+    * id : UUID <<PK>>
+    --
+    user_id : UUID
+    status : VARCHAR(20)
+    total_amount : DECIMAL(10,2)
+    shipping_address : TEXT
+    discount_code : VARCHAR(50)
+    payment_id : UUID
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+entity "order_items" as order_items {
+    * id : UUID <<PK>>
+    --
+    order_id : UUID <<FK>>
+    product_id : UUID
+    product_name : VARCHAR(255)
+    quantity : INTEGER
+    price : DECIMAL(10,2)
+    total : DECIMAL(10,2) (generated)
+    created_at : TIMESTAMP
+}
+
+entity "order_events" as order_events {
+    * id : BIGSERIAL <<PK>>
+    --
+    aggregate_id : UUID <<FK>>
+    event_type : VARCHAR(100)
+    event_data : JSONB
+    event_version : INTEGER
+    created_at : TIMESTAMP
+}
+
+entity "saga_state" as saga_state {
+    * id : UUID <<PK>>
+    --
+    saga_type : VARCHAR(50)
+    status : VARCHAR(20)
+    instruction : JSONB
+    step_results : JSONB
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' ===== PAYMENT SERVICE =====
+entity "payments" as payments {
+    * id : UUID <<PK>>
+    --
+    order_id : UUID
+    amount : DECIMAL(10,2)
+    method : VARCHAR(20)
+    status : VARCHAR(20)
+    transaction_id : VARCHAR(255) UNIQUE
+    external_data : JSONB
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' ===== INVENTORY SERVICE =====
+entity "products" as products {
+    * id : UUID <<PK>>
+    --
+    name : VARCHAR(255)
+    description : TEXT
+    price : DECIMAL(10,2)
+    category : VARCHAR(100)
+    image_url : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+entity "stock" as stock {
+    * id : UUID <<PK>>
+    --
+    product_id : UUID <<FK>>
+    quantity : INTEGER
+    reserved : INTEGER
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+entity "reservations" as reservations {
+    * id : UUID <<PK>>
+    --
+    order_id : UUID
+    product_id : UUID <<FK>>
+    quantity : INTEGER
+    status : VARCHAR(20)
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' ===== USER SERVICE =====
+entity "users" as users {
+    * id : UUID <<PK>>
+    --
+    email : VARCHAR(255) UNIQUE
+    password_hash : VARCHAR(255)
+    name : VARCHAR(100)
+    role : VARCHAR(20)
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' ===== NOTIFICATION SERVICE =====
+entity "notifications" as notifications {
+    * id : UUID <<PK>>
+    --
+    user_id : UUID
+    type : VARCHAR(50)
+    channel : VARCHAR(20)
+    status : VARCHAR(20)
+    content : JSONB
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' === СВЯЗИ ===
+orders ||--|{ order_items : "order_id"
+orders ||--o{ order_events : "aggregate_id"
+orders ||--o{ saga_state : "id"
+
+payments ||--o{ orders : "order_id" (слабая)
+
+products ||--o{ stock : "product_id"
+stock ||--o{ reservations : "product_id"
+
+@enduml

@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package product.v1;
+
+service ProductService {
+  rpc GetProduct(GetProductRequest) returns (Product);
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+  rpc UpdateStock(UpdateStockRequest) returns (UpdateStockResponse);
+  rpc ReserveStock(ReserveStockRequest) returns (ReserveStockResponse);
+  rpc ReleaseStock(ReleaseStockRequest) returns (ReleaseStockResponse);
+}
+
+message Product {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  string category = 5;
+  int32 stock = 6;
+  string image_url = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message GetProductRequest {
+  string product_id = 1;
+}
+
+message ListProductsRequest {
+  string category = 1;
+  string search = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+  int32 total = 2;
+}
+
+message UpdateStockRequest {
+  string product_id = 1;
+  int32 new_stock = 2;
+}
+
+message UpdateStockResponse {
+  bool success = 1;
+}
+
+message ReserveStockRequest {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message ReserveStockResponse {
+  bool success = 1;
+  string reservation_id = 2;
+}
+
+message ReleaseStockRequest {
+  string product_id = 1;
+  int32 quantity = 2;
+  string reservation_id = 3;
+}
+
+message ReleaseStockResponse {
+  bool success = 1;
+}

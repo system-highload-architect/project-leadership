@@ -1,0 +1,74 @@
+@startuml
+title Диаграмма последовательности — Создание заказа (микросервисы + Saga)
+
+actor "Покупатель" as Customer
+participant "Web UI" as UI
+participant "API Gateway" as Gateway
+participant "Order Service" as Order
+participant "Payment Service" as Payment
+participant "Inventory Service" as Inventory
+participant "Notification Service" as Notification
+participant "Kafka" as Kafka
+participant "Платёжный шлюз" as PaymentGateway
+
+Customer -> UI : Оформляет заказ
+UI -> Gateway : POST /orders
+activate Gateway
+
+Gateway -> Order : CreateOrder (gRPC)
+activate Order
+
+Order -> Order : Создаёт агрегат Order (NEW)
+Order -> Order : Сохраняет OrderCreated в Event Store
+Order -> Kafka : Публикует OrderCreated
+Kafka --> Order : Ack
+
+Order -> Payment : ProcessPayment (Saga шаг 1)
+activate Payment
+
+Payment -> Payment : Создаёт платёж (PENDING)
+Payment -> PaymentGateway : Authorize payment
+activate PaymentGateway
+PaymentGateway --> Payment : Payment success
+deactivate PaymentGateway
+
+Payment -> Payment : Обновляет статус на SUCCESS
+Payment -> Kafka : Публикует PaymentCompleted
+Payment --> Order : Payment completed
+deactivate Payment
+
+Order -> Inventory : ReserveStock (Saga шаг 2)
+activate Inventory
+
+Inventory -> Inventory : Проверяет остатки
+Inventory -> Inventory : Резервирует товары
+Inventory -> Kafka : Публикует InventoryReserved
+Inventory --> Order : Stock reserved
+deactivate Inventory
+
+Order -> Notification : SendOrderConfirmation (Saga шаг 3)
+activate Notification
+
+Notification -> Notification : Формирует уведомление
+Notification -> Kafka : Публикует NotificationRequest
+Notification --> Order : Notification sent
+deactivate Notification
+
+Order -> Order : Обновляет статус на PAID
+Order -> Kafka : Публикует OrderPaid
+Order --> Gateway : Order created (ID, статус)
+deactivate Order
+
+Gateway --> UI : 202 Accepted
+deactivate Gateway
+
+UI --> Customer : Заказ создан
+
+note right of Order
+  Saga Orchestrator:
+  - Координирует шаги (платёж → резервирование → уведомление)
+  - При ошибке запускает компенсацию
+  - Обеспечивает eventual consistency
+end note
+
+@enduml

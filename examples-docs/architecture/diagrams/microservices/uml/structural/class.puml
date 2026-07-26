@@ -1,0 +1,340 @@
+@startuml
+title Диаграмма классов — E‑Commerce Platform (микросервисы)
+
+' ===== ORDER SERVICE =====
+package "Order Service" {
+    class Order {
+        - id: UUID
+        - userId: UUID
+        - status: OrderStatus
+        - totalAmount: Money
+        - shippingAddress: String
+        - discountCode: String
+        - paymentId: UUID
+        - createdAt: Date
+        - updatedAt: Date
+        + apply(event: Event): void
+        + getEvent(): Event
+        + replay(events: Event[]): void
+    }
+    
+    enum OrderStatus {
+        NEW
+        PAID
+        SHIPPED
+        DELIVERED
+        CANCELLED
+    }
+    
+    class OrderItem {
+        - id: UUID
+        - productId: UUID
+        - productName: String
+        - quantity: int
+        - price: Money
+        - total: Money (derived)
+    }
+    
+    class OrderEvent {
+        - id: long
+        - aggregateId: UUID
+        - eventType: String
+        - eventData: JSON
+        - eventVersion: int
+        - createdAt: Date
+    }
+    
+    class SagaState {
+        - id: UUID
+        - sagaType: String
+        - status: SagaStatus
+        - instruction: JSON
+        - stepResults: JSON
+        - createdAt: Date
+        - updatedAt: Date
+    }
+    
+    enum SagaStatus {
+        NEW
+        IN_PROGRESS
+        COMPLETED
+        FAILED
+        CANCELLED
+    }
+    
+    interface OrderRepository {
+        + save(order: Order): void
+        + findById(id: UUID): Order
+        + findAll(filter: Filter): Order[]
+    }
+    
+    interface EventStore {
+        + save(aggregateId: UUID, events: Event[]): void
+        + load(aggregateId: UUID): Event[]
+    }
+    
+    interface EventPublisher {
+        + publish(event: Event): void
+    }
+    
+    interface SagaOrchestrator {
+        + startSaga(sagaType: String, data: Map): void
+        + getSagaStatus(sagaId: UUID): SagaState
+    }
+    
+    class CreateOrderUseCase {
+        - orderRepository: OrderRepository
+        - eventStore: EventStore
+        - eventPublisher: EventPublisher
+        - sagaOrchestrator: SagaOrchestrator
+        + execute(command: CreateOrderCommand): Order
+    }
+    
+    class CancelOrderUseCase {
+        - orderRepository: OrderRepository
+        - eventStore: EventStore
+        - eventPublisher: EventPublisher
+        - sagaOrchestrator: SagaOrchestrator
+        + execute(command: CancelOrderCommand): void
+    }
+    
+    class GetOrderUseCase {
+        - orderRepository: OrderRepository
+        + execute(query: GetOrderQuery): Order
+    }
+    
+    class ListOrdersUseCase {
+        - orderRepository: OrderRepository
+        + execute(query: ListOrdersQuery): Order[]
+    }
+    
+    Order "1" *-- "0..*" OrderItem : contains
+    Order "1" -- "0..*" OrderEvent : generates
+    Order "1" -- "0..1" SagaState : managed by
+    
+    OrderRepository <|.. PostgresOrderRepository : implements
+    EventStore <|.. PostgresEventStore : implements
+    EventPublisher <|.. KafkaEventPublisher : implements
+    SagaOrchestrator <|.. SagaOrchestratorImpl : implements
+    
+    CreateOrderUseCase --> OrderRepository : uses
+    CreateOrderUseCase --> EventStore : uses
+    CreateOrderUseCase --> EventPublisher : uses
+    CreateOrderUseCase --> SagaOrchestrator : uses
+}
+
+' ===== PAYMENT SERVICE =====
+package "Payment Service" {
+    class Payment {
+        - id: UUID
+        - orderId: UUID
+        - amount: Money
+        - method: PaymentMethod
+        - status: PaymentStatus
+        - transactionId: String
+        - externalData: JSON
+        - createdAt: Date
+        - updatedAt: Date
+    }
+    
+    enum PaymentMethod {
+        CARD
+        SBP
+        PAYPAL
+    }
+    
+    enum PaymentStatus {
+        PENDING
+        SUCCESS
+        FAILED
+        REFUNDED
+    }
+    
+    interface PaymentRepository {
+        + save(payment: Payment): void
+        + findById(id: UUID): Payment
+        + findByOrderId(orderId: UUID): Payment
+    }
+    
+    class ProcessPaymentUseCase {
+        - paymentRepository: PaymentRepository
+        - paymentGateway: PaymentGateway
+        + execute(command: ProcessPaymentCommand): Payment
+    }
+    
+    class RefundPaymentUseCase {
+        - paymentRepository: PaymentRepository
+        - paymentGateway: PaymentGateway
+        + execute(command: RefundPaymentCommand): void
+    }
+    
+    interface PaymentGateway {
+        + authorize(request: AuthorizeRequest): AuthorizeResponse
+        + capture(request: CaptureRequest): CaptureResponse
+        + refund(request: RefundRequest): RefundResponse
+    }
+}
+
+' ===== INVENTORY SERVICE =====
+package "Inventory Service" {
+    class Product {
+        - id: UUID
+        - name: String
+        - description: String
+        - price: Money
+        - category: String
+        - imageUrl: String
+        - createdAt: Date
+        - updatedAt: Date
+    }
+    
+    class Stock {
+        - id: UUID
+        - productId: UUID
+        - quantity: int
+        - reserved: int
+        - createdAt: Date
+        - updatedAt: Date
+    }
+    
+    class Reservation {
+        - id: UUID
+        - orderId: UUID
+        - productId: UUID
+        - quantity: int
+        - status: ReservationStatus
+        - createdAt: Date
+        - updatedAt: Date
+    }
+    
+    enum ReservationStatus {
+        ACTIVE
+        RELEASED
+        CONFIRMED
+    }
+    
+    interface InventoryRepository {
+        + saveStock(stock: Stock): void
+        + findStock(productId: UUID): Stock
+        + saveReservation(reservation: Reservation): void
+        + findReservation(orderId: UUID): Reservation
+    }
+    
+    class ReserveStockUseCase {
+        - inventoryRepository: InventoryRepository
+        + execute(command: ReserveStockCommand): Reservation
+    }
+    
+    class ReleaseStockUseCase {
+        - inventoryRepository: InventoryRepository
+        + execute(command: ReleaseStockCommand): void
+    }
+}
+
+' ===== USER SERVICE =====
+package "User Service" {
+    class User {
+        - id: UUID
+        - email: String
+        - passwordHash: String
+        - name: String
+        - role: UserRole
+        - createdAt: Date
+        - updatedAt: Date
+    }
+    
+    enum UserRole {
+        USER
+        MANAGER
+        ADMIN
+    }
+    
+    interface UserRepository {
+        + save(user: User): void
+        + findById(id: UUID): User
+        + findByEmail(email: String): User
+    }
+    
+    class RegisterUserUseCase {
+        - userRepository: UserRepository
+        - passwordEncoder: PasswordEncoder
+        + execute(command: RegisterUserCommand): User
+    }
+    
+    class AuthenticateUserUseCase {
+        - userRepository: UserRepository
+        - passwordEncoder: PasswordEncoder
+        - tokenGenerator: TokenGenerator
+        + execute(query: AuthenticateUserQuery): AuthToken
+    }
+}
+
+' ===== NOTIFICATION SERVICE =====
+package "Notification Service" {
+    class Notification {
+        - id: UUID
+        - userId: UUID
+        - type: NotificationType
+        - channel: NotificationChannel
+        - status: NotificationStatus
+        - content: JSON
+        - createdAt: Date
+        - updatedAt: Date
+    }
+    
+    enum NotificationType {
+        ORDER_CONFIRMATION
+        ORDER_CANCELLATION
+        PAYMENT_SUCCESS
+        PAYMENT_FAILED
+        DELIVERY_UPDATE
+    }
+    
+    enum NotificationChannel {
+        EMAIL
+        SMS
+        PUSH
+    }
+    
+    enum NotificationStatus {
+        PENDING
+        SENT
+        FAILED
+    }
+    
+    interface NotificationRepository {
+        + save(notification: Notification): void
+        + findById(id: UUID): Notification
+        + findByUserId(userId: UUID): Notification[]
+    }
+    
+    interface NotificationSender {
+        + send(notification: Notification): void
+    }
+    
+    class SendNotificationUseCase {
+        - notificationRepository: NotificationRepository
+        - notificationSender: NotificationSender
+        + execute(command: SendNotificationCommand): Notification
+    }
+}
+
+' ===== МЕЖСЕРВИСНЫЕ ЗАВИСИМОСТИ (через события) =====
+note right of Order
+  Order Service зависит от:
+  - Payment Service (через события)
+  - Inventory Service (через события)
+  - User Service (через идентификатор)
+end note
+
+note right of Payment
+  Payment Service зависит от:
+  - Order Service (через событие OrderPaid)
+end note
+
+note right of Reservation
+  Inventory Service зависит от:
+  - Order Service (через событие OrderCreated)
+end note
+
+@enduml

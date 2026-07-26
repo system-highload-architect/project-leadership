@@ -1,0 +1,60 @@
+@startuml
+title Диаграмма последовательности — Обработка уведомления (Serverless)
+
+participant "Kafka" as Kafka
+participant "Lambda Handler" as Handler
+participant "NotificationService" as Service
+participant "EmailAdapter" as Email
+participant "SMSAdapter" as SMS
+participant "PushAdapter" as Push
+participant "NotificationRepository" as Repo
+participant "External API" as External
+
+Kafka -> Handler : Приходит OrderCreated
+activate Handler
+
+Handler -> Handler : Парсит событие
+Handler -> Service : ProcessNotification
+activate Service
+
+Service -> Service : Определяет тип уведомления
+Service -> Repo : Сохраняет уведомление (PENDING)
+activate Repo
+Repo --> Service : OK
+deactivate Repo
+
+alt Email
+    Service -> Email : Send
+    activate Email
+    Email -> External : Send email
+    External --> Email : OK
+    Email --> Service : OK
+    deactivate Email
+else SMS
+    Service -> SMS : Send
+    activate SMS
+    SMS -> External : Send SMS
+    External --> SMS : OK
+    SMS --> Service : OK
+    deactivate SMS
+else Push
+    Service -> Push : Send
+    activate Push
+    Push -> External : Send push
+    External --> Push : OK
+    Push --> Service : OK
+    deactivate Push
+end
+
+Service -> Repo : Обновляет статус на SENT
+activate Repo
+Repo --> Service : OK
+deactivate Repo
+
+Service --> Handler : Уведомление обработано
+deactivate Service
+
+Handler --> Kafka : Ack
+deactivate Handler
+
+@enduml

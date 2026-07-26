@@ -1,0 +1,50 @@
+@startuml
+title Концептуальная ER-диаграмма — E‑Commerce Platform (Serverless)
+
+' ===== МИКРОСЕРВИСЫ (контейнеры) =====
+entity "Заказ" as order
+entity "Позиция заказа" as order_item
+entity "Событие заказа" as order_event
+entity "Сага" as saga
+
+entity "Платёж" as payment
+entity "Событие платежа" as payment_event
+
+entity "Товар" as product
+entity "Остаток" as stock
+entity "Резервирование" as reservation
+
+entity "Пользователь" as user
+
+' ===== СЕРВЕРЛЕСНЫЕ СУЩНОСТИ =====
+entity "Уведомление" as notification
+entity "Отчёт" as report
+entity "Экспорт" as export
+
+' === СВЯЗИ ===
+order ||--|{ order_item : "содержит"
+order ||--o{ order_event : "порождает"
+order ||--o{ saga : "управляется"
+
+payment ||--o{ payment_event : "порождает"
+product ||--o{ stock : "имеет"
+stock ||--o{ reservation : "участвует в"
+
+order ||--o{ notification : "порождает (через событие)"
+order ||--o{ report : "используется для отчётов"
+order ||--o{ export : "экспортируется"
+
+' === ПОЯСНЕНИЯ ===
+note right of notification
+  Серверлесная функция:
+  - Хранит историю уведомлений
+  - Используется для аудита
+end note
+
+note right of report
+  Серверлесная функция:
+  - Генерирует отчёты (S3 / Athena)
+  - Хранит агрегированные данные
+end note
+
+@enduml

@@ -1,0 +1,63 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+title Диаграмма контейнеров — E‑Commerce Platform (модульный монолит)
+
+' === ПОЛЬЗОВАТЕЛИ ===
+Person(customer, "Покупатель", "Просматривает каталог, оформляет заказы")
+Person(manager, "Менеджер", "Управляет товарами и заказами")
+
+' === ГРАНИЦА СИСТЕМЫ ===
+System_Boundary(ecommerce, "E‑Commerce Platform") {
+    Container(web_ui, "Web UI", "React + TypeScript", "Пользовательский интерфейс для покупателей, менеджеров и администраторов")
+    Container(api_gateway, "API Gateway", "Go + Gin", "Единая точка входа, маршрутизация, аутентификация, rate limiting")
+    
+    Container(backend, "Backend (модульный монолит)", "Go + Clean Architecture", "Бизнес-логика: товары, корзина, заказы, платежи, пользователи, уведомления")
+    
+    ContainerDb(postgres_write, "PostgreSQL (Write DB)", "PostgreSQL 15+", "Нормализованная схема для команд (заказы, платежи, товары, пользователи)")
+    ContainerDb(postgres_read, "PostgreSQL (Read DB)", "PostgreSQL 15+", "Денормализованные проекции для CQRS (запросы, отчёты)")
+    ContainerDb(event_store, "Event Store", "PostgreSQL 15+", "Хранилище событий для Event Sourcing (Order Service)")
+    
+    Container(redis, "Redis", "Redis 6.2+", "Кэш (сессии, корзина, частые запросы)")
+    Container(kafka, "Kafka", "Apache Kafka 3.x", "Брокер событий (заказы, платежи, уведомления)")
+}
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+System_Ext(payment_gateway, "Платёжный шлюз", "Обработка платежей")
+System_Ext(notification_service, "Сервис уведомлений", "Email/SMS/push")
+System_Ext(delivery_service, "Сервис доставки", "Расчёт и отслеживание")
+
+' === СВЯЗИ ПОЛЬЗОВАТЕЛЕЙ ===
+Rel(customer, web_ui, "Использует", "HTTPS")
+Rel(manager, web_ui, "Использует", "HTTPS")
+Rel(web_ui, api_gateway, "Вызывает", "HTTPS/REST")
+Rel(api_gateway, backend, "Маршрутизирует запросы", "gRPC (внутренний)")
+
+' === СВЯЗИ БЭКЕНДА С БАЗАМИ ДАННЫХ ===
+Rel(backend, postgres_write, "Читает/пишет (команды)", "SQL")
+Rel(backend, postgres_read, "Читает (запросы, отчёты)", "SQL")
+Rel(backend, event_store, "Сохраняет/читает события (Event Sourcing)", "SQL")
+Rel(backend, redis, "Читает/пишет (кэш)", "RESP")
+
+' === СВЯЗИ БЭКЕНДА С KAFKA ===
+Rel(backend, kafka, "Публикует события", "Kafka Protocol")
+Rel(kafka, backend, "Доставляет события подписчикам", "Kafka Protocol")
+
+' === СВЯЗИ С ВНЕШНИМИ СИСТЕМАМИ ===
+Rel(backend, payment_gateway, "Вызывает (платежи)", "HTTPS/REST")
+Rel(backend, notification_service, "Вызывает (уведомления)", "SMTP/HTTP")
+Rel(backend, delivery_service, "Вызывает (доставка)", "HTTP/REST")
+
+' === КОММЕНТАРИЙ ===
+note right of backend
+  Модули внутри монолита:
+  - Product (товары)
+  - Order (заказы) + Event Sourcing
+  - Payment (платежи)
+  - User (пользователи)
+  - Notification (уведомления)
+  - Inventory (резервирование)
+end note
+
+@enduml

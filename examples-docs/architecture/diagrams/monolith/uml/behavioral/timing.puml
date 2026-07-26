@@ -1,0 +1,25 @@
+@startuml
+' Timing Diagram — Order State Changes
+' PlantUML timing syntax:
+
+concise "Order State" as OrderState
+
+@0
+OrderState is NEW
+@10
+OrderState is PAID
+@20
+OrderState is SHIPPED
+@30
+OrderState is DELIVERED
+@40
+OrderState is CANCELLED
+
+' Добавим ещё одну линию жизни для наглядности
+concise "Payment Status" as PaymentState
+@5
+PaymentState is PENDING
+@15
+PaymentState is SUCCESS
+
+@endumlы

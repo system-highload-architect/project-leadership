@@ -1,0 +1,70 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+title Контекстная диаграмма — E‑Commerce Platform (Event‑Driven)
+
+' === ПОЛЬЗОВАТЕЛИ ===
+Person(customer, "Покупатель", "Просматривает каталог, оформляет заказы, оплачивает")
+Person(manager, "Менеджер", "Управляет товарами, заказами, клиентами")
+Person(admin, "Администратор", "Управляет пользователями, настройками, мониторит систему")
+
+' === ГРАНИЦА СИСТЕМЫ ===
+System_Boundary(ecommerce, "E‑Commerce Platform (Event‑Driven)") {
+    System(api_gateway, "API Gateway", "Единая точка входа, маршрутизация, аутентификация")
+    System(kafka, "Kafka", "Центральная шина событий (все коммуникации через события)")
+    System(order_service, "Order Service", "Управление заказами (Event Sourcing + CQRS)")
+    System(payment_service, "Payment Service", "Управление платежами (событийный)")
+    System(inventory_service, "Inventory Service", "Управление товарами и остатками (событийный)")
+    System(user_service, "User Service", "Управление пользователями (событийный)")
+    System(notification_service, "Notification Service", "Отправка уведомлений (событийный)")
+}
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+System_Ext(payment_gateway, "Платёжный шлюз", "Обработка платежей")
+System_Ext(delivery_service, "Сервис доставки", "Расчёт стоимости, отслеживание")
+System_Ext(analytics, "Система аналитики", "Сбор данных для отчётов")
+
+' === СВЯЗИ ПОЛЬЗОВАТЕЛЕЙ ===
+Rel(customer, api_gateway, "Использует", "HTTPS")
+Rel(manager, api_gateway, "Использует", "HTTPS")
+Rel(admin, api_gateway, "Использует", "HTTPS")
+
+' === API GATEWAY → KAFKA (события) ===
+Rel(api_gateway, kafka, "Публикует команды как события", "Kafka Protocol")
+
+' === СЕРВИСЫ → KAFKA (публикация событий) ===
+Rel(order_service, kafka, "Публикует события (OrderCreated, OrderPaid, etc.)", "Kafka Protocol")
+Rel(payment_service, kafka, "Публикует события (PaymentCompleted, PaymentFailed)", "Kafka Protocol")
+Rel(inventory_service, kafka, "Публикует события (InventoryReserved, InventoryReleased)", "Kafka Protocol")
+Rel(user_service, kafka, "Публикует события (UserRegistered, UserUpdated)", "Kafka Protocol")
+Rel(notification_service, kafka, "Публикует события (NotificationSent)", "Kafka Protocol")
+
+' === KAFKA → СЕРВИСЫ (подписка на события) ===
+Rel(kafka, order_service, "Доставляет события (PaymentCompleted, InventoryReserved)", "Kafka Protocol")
+Rel(kafka, payment_service, "Доставляет события (OrderCreated)", "Kafka Protocol")
+Rel(kafka, inventory_service, "Доставляет события (OrderCreated, OrderCancelled)", "Kafka Protocol")
+Rel(kafka, notification_service, "Доставляет события (OrderCreated, PaymentCompleted, OrderCancelled)", "Kafka Protocol")
+Rel(kafka, analytics, "Доставляет все события для аналитики", "Kafka Protocol")
+
+' === ВНЕШНИЕ СВЯЗИ ===
+Rel(payment_service, payment_gateway, "Обрабатывает платежи", "HTTPS/REST")
+Rel(order_service, delivery_service, "Создаёт заявки на доставку", "HTTP/REST")
+
+' === ПОЯСНЕНИЯ ===
+note right of kafka
+  Kafka — центральная шина событий:
+  - Все сервисы общаются через события
+  - Нет прямых синхронных вызовов между сервисами
+  - События хранятся для replay
+  - Поддерживает eventual consistency
+end note
+
+note right of order_service
+  Order Service:
+  - Подписывается на PaymentCompleted и InventoryReserved
+  - Публикует OrderCreated, OrderPaid, OrderShipped, OrderCancelled
+  - Event Sourcing + CQRS
+end note
+
+@enduml

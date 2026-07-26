@@ -1,0 +1,131 @@
+@startuml
+title C4-уровень Code — Order Service (Go)
+
+' === ДОМЕН (Domain) ===
+class Order {
+  - ID: uuid.UUID
+  - CustomerID: uuid.UUID
+  - Status: OrderStatus
+  - Items: []OrderItem
+  - TotalAmount: float64
+  - ShippingAddress: string
+  - CreatedAt: time.Time
+  - UpdatedAt: time.Time
+  + Apply(event Event): void
+  + GetEvent(): Event
+}
+
+enum OrderStatus {
+  NEW
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+class OrderItem {
+  - ProductID: uuid.UUID
+  - ProductName: string
+  - Quantity: int
+  - Price: float64
+  - Total: float64
+}
+
+' === ИНТЕРФЕЙСЫ (Ports) ===
+interface OrderRepository {
+  + Save(ctx context.Context, order *Order): error
+  + FindByID(ctx context.Context, id uuid.UUID): (*Order, error)
+  + FindAll(ctx context.Context, filter Filter): ([]*Order, error)
+}
+
+interface EventPublisher {
+  + Publish(ctx context.Context, event Event): error
+}
+
+interface EventStore {
+  + Save(aggregateID string, events ...Event): error
+  + Load(aggregateID string): ([]Event, error)
+}
+
+' === USE CASES (Application Layer) ===
+class CreateOrderUseCase {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventBus: EventPublisher
+  + Execute(ctx context.Context, cmd CreateOrderCommand): (*Order, error)
+}
+
+class CancelOrderUseCase {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventBus: EventPublisher
+  + Execute(ctx context.Context, cmd CancelOrderCommand): error
+}
+
+class GetOrderUseCase {
+  - repo: OrderRepository
+  + Execute(ctx context.Context, query GetOrderQuery): (*Order, error)
+}
+
+' === АДАПТЕРЫ (Adapters) ===
+class PostgresOrderRepository {
+  - db: *sql.DB
+  + Save(ctx context.Context, order *Order): error
+  + FindByID(ctx context.Context, id uuid.UUID): (*Order, error)
+  + FindAll(ctx context.Context, filter Filter): ([]*Order, error)
+}
+
+class KafkaEventPublisher {
+  - producer: sarama.SyncProducer
+  + Publish(ctx context.Context, event Event): error
+}
+
+class PostgresEventStore {
+  - db: *sql.DB
+  + Save(aggregateID string, events ...Event): error
+  + Load(aggregateID string): ([]Event, error)
+}
+
+' === ЗАВИСИМОСТИ ===
+Order "1" *-- "0..*" OrderItem : contains
+
+OrderRepository <|.. PostgresOrderRepository : implements
+EventPublisher <|.. KafkaEventPublisher : implements
+EventStore <|.. PostgresEventStore : implements
+
+CreateOrderUseCase --> OrderRepository : uses
+CreateOrderUseCase --> EventStore : uses
+CreateOrderUseCase --> EventPublisher : uses
+
+CancelOrderUseCase --> OrderRepository : uses
+CancelOrderUseCase --> EventStore : uses
+CancelOrderUseCase --> EventPublisher : uses
+
+GetOrderUseCase --> OrderRepository : uses
+
+Order --> OrderStatus : uses (enum)
+
+' === ПОЯСНЕНИЯ ===
+note bottom of Order
+  Агрегат Order:
+  - Восстанавливается из событий (Event Sourcing)
+  - Метод Apply(event) изменяет состояние
+  - Метод GetEvent() возвращает новое событие
+end note
+
+note bottom of CreateOrderUseCase
+  Use Case: создание заказа
+  1. Создаёт агрегат Order
+  2. Получает событие OrderCreated
+  3. Сохраняет событие в Event Store
+  4. Публикует событие в Kafka
+end note
+
+note bottom of PostgresOrderRepository
+  Реализация репозитория:
+  - Write DB (нормализованная схема)
+  - Read DB (денормализованные проекции)
+  - Использует pgx (нативный драйвер)
+end note
+
+@enduml

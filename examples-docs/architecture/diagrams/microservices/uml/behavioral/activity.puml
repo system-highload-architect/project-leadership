@@ -1,0 +1,57 @@
+@startuml
+title Диаграмма деятельности — Создание заказа (микросервисы + Saga)
+
+start
+
+:Покупатель оформляет заказ;
+:Валидация данных (корзина, адрес);
+
+if (Корзина пуста?) then (Да)
+    :Показать ошибку "Корзина пуста";
+    stop
+else (Нет)
+endif
+
+:Создание заказа (Order Service);
+:Сохранение события OrderCreated в Event Store;
+:Публикация OrderCreated в Kafka;
+
+:Запуск Saga (CreateOrder);
+:Шаг 1: Обработка платежа (Payment Service);
+
+if (Платёж успешен?) then (Да)
+    :Публикация PaymentCompleted;
+else (Нет)
+    :Компенсация: отмена заказа (OrderCancelled);
+    :Компенсация: возврат платежа (PaymentRefunded);
+    :Публикация OrderCancelled;
+    stop
+endif
+
+:Шаг 2: Резервирование товаров (Inventory Service);
+
+if (Резервирование успешно?) then (Да)
+    :Публикация InventoryReserved;
+else (Нет)
+    :Компенсация: отмена заказа (OrderCancelled);
+    :Компенсация: возврат платежа (PaymentRefunded);
+    :Компенсация: освобождение товаров (StockReleased);
+    :Публикация OrderCancelled;
+    stop
+endif
+
+:Шаг 3: Отправка уведомления (Notification Service);
+:Публикация NotificationSent;
+
+:Обновление статуса заказа на PAID;
+:Публикация OrderPaid;
+
+:Проекция (CQRS) обновляет Read DB;
+:Аналитика получает событие OrderCreated;
+:Дополнительные уведомления отправляются клиенту;
+
+:Покупатель видит подтверждение заказа;
+
+stop
+
+@enduml

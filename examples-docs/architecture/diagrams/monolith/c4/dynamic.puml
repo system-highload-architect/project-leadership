@@ -1,0 +1,46 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+LAYOUT_WITH_LEGEND()
+title Динамическая диаграмма — Создание заказа (Place Order)
+
+' === УЧАСТНИКИ ===
+Person(customer, "Покупатель")
+
+System_Ext(web_ui, "Web UI")
+System_Ext(api_gateway, "API Gateway")
+System_Ext(backend, "Backend (модульный монолит)")
+
+' === ВНУТРЕННИЕ МОДУЛИ (как отдельные элементы для наглядности) ===
+System_Ext(order_module, "Order Module")
+System_Ext(payment_module, "Payment Module")
+System_Ext(inventory_module, "Inventory Module")
+System_Ext(notification_module, "Notification Module")
+
+System_Ext(kafka, "Kafka")
+System_Ext(payment_gateway, "Платёжный шлюз")
+System_Ext(notification_service, "Сервис уведомлений")
+
+' === СЦЕНАРИЙ ===
+Rel(customer, web_ui, "1. Оформляет заказ", "HTTPS")
+Rel(web_ui, api_gateway, "2. POST /orders", "HTTPS/REST")
+Rel(api_gateway, backend, "3. CreateOrder", "gRPC")
+
+' === ШАГИ ВНУТРИ БЭКЕНДА ===
+Rel(backend, order_module, "4. CreateOrderUseCase")
+Rel(order_module, payment_module, "5. InitiatePayment (Saga шаг 1)", "синхронный вызов")
+Rel(order_module, kafka, "6. Публикует событие OrderCreated", "Kafka")
+
+Rel(payment_module, payment_gateway, "7. Обработка платежа", "HTTPS/REST")
+Rel(payment_gateway, payment_module, "8. Payment success", "HTTPS/REST")
+Rel(payment_module, kafka, "9. Публикует PaymentCompleted", "Kafka")
+
+Rel(kafka, inventory_module, "10. Подписчик: резервирует товары", "Kafka")
+Rel(inventory_module, kafka, "11. Публикует InventoryReserved", "Kafka")
+
+Rel(kafka, notification_module, "12. Подписчик: отправляет уведомление", "Kafka")
+Rel(notification_module, notification_service, "13. Отправка email/SMS", "SMTP/HTTP")
+
+Rel(order_module, kafka, "14. Обновляет статус заказа на PAID", "Kafka (событие OrderPaid)")
+
+@enduml

@@ -1,0 +1,60 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+LAYOUT_WITH_LEGEND()
+title Динамическая диаграмма — Создание заказа (микросервисы + Saga)
+
+' === УЧАСТНИКИ ===
+Person(customer, "Покупатель")
+
+System_Ext(web_ui, "Web UI")
+System_Ext(api_gateway, "API Gateway")
+System_Ext(order_service, "Order Service (Saga Orchestrator)")
+System_Ext(payment_service, "Payment Service")
+System_Ext(inventory_service, "Inventory Service")
+System_Ext(notification_service, "Notification Service")
+System_Ext(kafka, "Kafka")
+System_Ext(payment_gateway, "Платёжный шлюз")
+
+' === СЦЕНАРИЙ ===
+Rel(customer, web_ui, "1. Оформляет заказ", "HTTPS")
+Rel(web_ui, api_gateway, "2. POST /orders", "HTTPS/REST")
+Rel(api_gateway, order_service, "3. CreateOrder (gRPC)", "gRPC")
+
+' === ШАГИ SAGA (Оркестрация) ===
+Rel(order_service, payment_service, "4. ProcessPayment (Saga шаг 1)", "gRPC")
+Rel(payment_service, payment_gateway, "5. Authorize payment", "HTTPS/REST")
+Rel(payment_gateway, payment_service, "6. Payment success", "HTTPS/REST")
+Rel(payment_service, order_service, "7. Payment completed", "gRPC")
+
+Rel(order_service, inventory_service, "8. ReserveStock (Saga шаг 2)", "gRPC")
+Rel(inventory_service, order_service, "9. Stock reserved", "gRPC")
+
+Rel(order_service, notification_service, "10. SendOrderConfirmation (Saga шаг 3)", "gRPC")
+Rel(notification_service, order_service, "11. Notification sent", "gRPC")
+
+' === ПУБЛИКАЦИЯ СОБЫТИЙ ===
+Rel(order_service, kafka, "12. Публикует OrderCreated (событие для других сервисов)", "Kafka")
+Rel(kafka, notification_service, "13. Подписчик: отправляет дополнительное уведомление", "Kafka")
+Rel(kafka, analytics, "14. Подписчик: отправляет событие в аналитику", "Kafka")
+
+' === КОМПЕНСАЦИЯ (при ошибке) ===
+note right of order_service
+  Если любой шаг завершился ошибкой:
+  1. OrderService запускает компенсацию (обратный порядок)
+  2. Отмена платежа (refund)
+  3. Освобождение товаров (release)
+  4. Отмена заказа (CANCELLED)
+  5. Публикуется OrderCancelled событие
+end note
+
+' === ПОЯСНЕНИЯ ===
+note bottom of order_service
+  Saga Orchestrator:
+  - Координирует шаги (4, 8, 10)
+  - Хранит состояние Saga в БД
+  - При ошибке запускает компенсацию
+  - Обеспечивает eventual consistency
+end note
+
+@enduml

@@ -1,0 +1,50 @@
+@startuml
+title Диаграмма последовательности — создание заказа
+
+actor "Покупатель" as Customer
+participant "Web UI" as UI
+participant "API Gateway" as Gateway
+participant "Order Service" as Order
+participant "Payment Service" as Payment
+participant "Inventory Service" as Inventory
+participant "Notification Service" as Notification
+participant "Kafka" as Kafka
+database "PostgreSQL" as DB
+
+Customer -> UI : Оформление заказа
+UI -> Gateway : POST /orders
+Gateway -> Order : CreateOrder
+activate Order
+
+Order -> DB : Сохранить заказ (NEW)
+DB --> Order : OK
+
+Order -> Payment : ProcessPayment (Saga шаг 1)
+activate Payment
+Payment -> Kafka : Публикация события PaymentInitiated
+Payment --> Order : OK
+deactivate Payment
+
+Order -> Inventory : ReserveStock (Saga шаг 2)
+activate Inventory
+Inventory -> Kafka : Публикация InventoryReserved
+Inventory --> Order : OK
+deactivate Inventory
+
+Order -> Notification : SendNotification (Saga шаг 3)
+activate Notification
+Notification -> Kafka : Публикация NotificationSent
+Notification --> Order : OK
+deactivate Notification
+
+Order -> DB : Обновить статус заказа (PAID)
+DB --> Order : OK
+
+Order -> Kafka : Публикация OrderCreated
+Order --> Gateway : Order created
+deactivate Order
+
+Gateway --> UI : 202 Accepted
+UI --> Customer : Заказ создан
+
+@enduml

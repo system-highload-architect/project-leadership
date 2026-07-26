@@ -1,0 +1,99 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+title Диаграмма контейнеров — E‑Commerce Platform (Event‑Driven)
+
+' === ПОЛЬЗОВАТЕЛИ ===
+Person(customer, "Покупатель", "Просматривает каталог, оформляет заказы")
+Person(manager, "Менеджер", "Управляет товарами и заказами")
+Person(admin, "Администратор", "Управляет пользователями и настройками")
+
+' === ГРАНИЦА СИСТЕМЫ ===
+System_Boundary(ecommerce, "E‑Commerce Platform (Event‑Driven)") {
+    
+    ' === API Gateway ===
+    Container(api_gateway, "API Gateway", "Go + Gin", "Единая точка входа, аутентификация, маршрутизация, публикация команд как событий")
+    
+    ' === Сервисы (все подписываются/публикуют события) ===
+    Container(order_service, "Order Service", "Go + Clean Architecture", "Управление заказами (Event Sourcing + CQRS)")
+    Container(payment_service, "Payment Service", "Go + Clean Architecture", "Управление платежами (событийный)")
+    Container(inventory_service, "Inventory Service", "Go + Clean Architecture", "Управление товарами и остатками (событийный)")
+    Container(user_service, "User Service", "Go + Clean Architecture", "Управление пользователями (событийный)")
+    Container(notification_service, "Notification Service", "Go + Clean Architecture", "Отправка уведомлений (событийный)")
+    
+    ' === Брокер событий (центральная шина) ===
+    Container(kafka, "Kafka", "Apache Kafka 3.x", "Центральная шина событий (все коммуникации через события)")
+    
+    ' === Базы данных ===
+    ContainerDb(order_db, "Order DB", "PostgreSQL 15+", "Write DB + Event Store")
+    ContainerDb(order_read_db, "Order Read DB", "PostgreSQL 15+", "Read DB (проекции для CQRS)")
+    ContainerDb(payment_db, "Payment DB", "PostgreSQL 15+", "Данные о платежах")
+    ContainerDb(inventory_db, "Inventory DB", "PostgreSQL 15+", "Товары и остатки")
+    ContainerDb(user_db, "User DB", "PostgreSQL 15+", "Пользователи, роли")
+    ContainerDb(notification_db, "Notification DB", "PostgreSQL 15+", "История уведомлений")
+    
+    ' === Кэш ===
+    Container(redis, "Redis", "Redis 6.2+", "Распределённый кэш")
+}
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+System_Ext(payment_gateway, "Платёжный шлюз", "Обработка платежей")
+System_Ext(delivery_service, "Сервис доставки", "Расчёт и отслеживание")
+System_Ext(analytics, "Система аналитики", "Сбор данных для отчётов")
+
+' === СВЯЗИ ПОЛЬЗОВАТЕЛЕЙ ===
+Rel(customer, api_gateway, "Использует", "HTTPS")
+Rel(manager, api_gateway, "Использует", "HTTPS")
+Rel(admin, api_gateway, "Использует", "HTTPS")
+
+' === API GATEWAY → KAFKA ===
+Rel(api_gateway, kafka, "Публикует команды как события (CreateOrder, UpdatePayment, etc.)", "Kafka Protocol")
+
+' === СЕРВИСЫ → KAFKA (публикация) ===
+Rel(order_service, kafka, "Публикует события (OrderCreated, OrderPaid, OrderShipped, OrderCancelled)", "Kafka Protocol")
+Rel(payment_service, kafka, "Публикует события (PaymentCompleted, PaymentFailed)", "Kafka Protocol")
+Rel(inventory_service, kafka, "Публикует события (InventoryReserved, InventoryReleased)", "Kafka Protocol")
+Rel(user_service, kafka, "Публикует события (UserRegistered, UserUpdated)", "Kafka Protocol")
+Rel(notification_service, kafka, "Публикует события (NotificationSent)", "Kafka Protocol")
+
+' === KAFKA → СЕРВИСЫ (подписка) ===
+Rel(kafka, order_service, "Доставляет события (PaymentCompleted, InventoryReserved)", "Kafka Protocol")
+Rel(kafka, payment_service, "Доставляет события (OrderCreated)", "Kafka Protocol")
+Rel(kafka, inventory_service, "Доставляет события (OrderCreated, OrderCancelled)", "Kafka Protocol")
+Rel(kafka, notification_service, "Доставляет события (OrderCreated, PaymentCompleted, OrderCancelled)", "Kafka Protocol")
+Rel(kafka, analytics, "Доставляет все события для аналитики", "Kafka Protocol")
+
+' === БАЗЫ ДАННЫХ ===
+Rel(order_service, order_db, "Сохраняет заказы и события", "SQL")
+Rel(order_service, order_read_db, "Читает проекции", "SQL")
+Rel(payment_service, payment_db, "Сохраняет платежи", "SQL")
+Rel(inventory_service, inventory_db, "Читает/пишет товары", "SQL")
+Rel(user_service, user_db, "Читает/пишет пользователей", "SQL")
+Rel(notification_service, notification_db, "Сохраняет историю уведомлений", "SQL")
+
+' === КЭШ ===
+Rel(user_service, redis, "Читает/пишет сессии", "RESP")
+Rel(inventory_service, redis, "Кэширует товары", "RESP")
+
+' === ВНЕШНИЕ СВЯЗИ ===
+Rel(payment_service, payment_gateway, "Обрабатывает платежи", "HTTPS/REST")
+Rel(order_service, delivery_service, "Создаёт заявки", "HTTP/REST")
+
+' === ПОЯСНЕНИЯ ===
+note right of kafka
+  Kafka — центральная шина событий:
+  - Все сервисы общаются асинхронно через события
+  - Нет прямых синхронных вызовов между сервисами
+  - События хранятся для replay
+  - Поддерживает eventual consistency
+end note
+
+note right of order_service
+  Order Service:
+  - Подписывается на PaymentCompleted и InventoryReserved
+  - Публикует события жизненного цикла заказа
+  - Event Sourcing + CQRS
+end note
+
+@enduml

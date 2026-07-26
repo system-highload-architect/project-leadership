@@ -1,0 +1,56 @@
+@startuml
+title Диаграмма профилей — Event‑Driven Stereotypes
+
+class Order <<Entity>> {
+  tableName = "orders"
+  version = 1
+  - id: UUID
+  - status: OrderStatus
+}
+
+class OrderService <<Service>> {
+  + createOrder(dto: CreateOrderDTO): Order
+  + cancelOrder(id: UUID): void
+  + getOrder(id: UUID): Order
+}
+
+class OrderRepository <<Repository>> {
+  + save(order: Order): void
+  + findById(id: UUID): Order
+  + findAll(): List<Order>
+}
+
+class OrderDTO <<DTO>> {
+  + id: UUID
+  + status: String
+  + items: OrderItemDTO[]
+}
+
+class OrderCreated <<Event>> {
+  + aggregateId: UUID
+  + customerId: UUID
+  + items: OrderItem[]
+  + timestamp: time.Time
+}
+
+class PaymentCompleted <<Event>> {
+  + orderId: UUID
+  + paymentId: UUID
+  + amount: float64
+  + timestamp: time.Time
+}
+
+class CreateOrderCommand <<Command>> {
+  + commandId: UUID
+  + customerId: UUID
+  + items: OrderItem[]
+  + shippingAddress: string
+}
+
+OrderService ..> Order : uses
+OrderService ..> OrderDTO : uses
+OrderRepository ..> Order : uses
+OrderService ..> OrderCreated : publishes
+OrderService ..> PaymentCompleted : subscribes
+
+@enduml

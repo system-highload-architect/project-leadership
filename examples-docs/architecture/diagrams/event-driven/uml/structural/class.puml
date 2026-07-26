@@ -1,0 +1,201 @@
+@startuml
+title Диаграмма классов — E‑Commerce Platform (Event‑Driven)
+
+' ===== БАЗОВЫЕ КЛАССЫ =====
+class Event {
+  - AggregateID: UUID
+  - Timestamp: time.Time
+  - Version: int
+  + GetAggregateID(): UUID
+  + GetTimestamp(): time.Time
+  + GetVersion(): int
+}
+
+class Command {
+  - CommandID: UUID
+  - Timestamp: time.Time
+  + GetCommandID(): UUID
+  + GetTimestamp(): time.Time
+}
+
+' ===== СОБЫТИЯ (ORDER SERVICE) =====
+class OrderCreated extends Event {
+  - OrderID: UUID
+  - CustomerID: UUID
+  - Items: []OrderItem
+  - TotalAmount: float64
+}
+
+class OrderPaid extends Event {
+  - OrderID: UUID
+  - PaymentID: UUID
+}
+
+class OrderCancelled extends Event {
+  - OrderID: UUID
+  - Reason: string
+}
+
+class OrderShipped extends Event {
+  - OrderID: UUID
+  - TrackingNumber: string
+}
+
+' ===== КОМАНДЫ (ORDER SERVICE) =====
+class CreateOrderCommand extends Command {
+  - CustomerID: UUID
+  - Items: []OrderItem
+  - ShippingAddress: string
+}
+
+class CancelOrderCommand extends Command {
+  - OrderID: UUID
+  - Reason: string
+}
+
+' ===== АГРЕГАТ =====
+class Order {
+  - ID: UUID
+  - CustomerID: UUID
+  - Status: OrderStatus
+  - Items: []OrderItem
+  - TotalAmount: float64
+  - ShippingAddress: string
+  - PaymentID: UUID
+  - CreatedAt: time.Time
+  - UpdatedAt: time.Time
+  + Apply(event Event): void
+  + GetEvents(): []Event
+  + Replay(events []Event): void
+}
+
+enum OrderStatus {
+  NEW
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+class OrderItem {
+  - ProductID: UUID
+  - ProductName: string
+  - Quantity: int
+  - Price: float64
+  - Total: float64
+}
+
+' ===== USE CASES (COMMAND HANDLERS) =====
+class CreateOrderHandler {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventPublisher: EventPublisher
+  + Handle(command CreateOrderCommand): Order
+}
+
+class CancelOrderHandler {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventPublisher: EventPublisher
+  + Handle(command CancelOrderCommand): void
+}
+
+' ===== EVENT HANDLERS (ПОДПИСЧИКИ) =====
+class OrderEventHandler {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventPublisher: EventPublisher
+  + HandlePaymentCompleted(event PaymentCompleted): void
+  + HandleInventoryReserved(event InventoryReserved): void
+  + HandlePaymentFailed(event PaymentFailed): void
+}
+
+' ===== ИНТЕРФЕЙСЫ (PORTS) =====
+interface OrderRepository {
+  + Save(order Order): void
+  + FindByID(id UUID): Order
+  + FindAll(filter Filter): []Order
+}
+
+interface EventStore {
+  + Save(aggregateID UUID, events []Event): void
+  + Load(aggregateID UUID): []Event
+}
+
+interface EventPublisher {
+  + Publish(event Event): void
+}
+
+interface EventConsumer {
+  + Subscribe(topic string, handler func(Event) error): void
+}
+
+' === ЗАВИСИМОСТИ ===
+Order "1" *-- "0..*" OrderItem : contains
+Order "1" -- "1..*" Event : generates
+
+OrderRepository <|.. PostgresOrderRepository : implements
+EventStore <|.. PostgresEventStore : implements
+EventPublisher <|.. KafkaEventPublisher : implements
+EventConsumer <|.. KafkaEventConsumer : implements
+
+CreateOrderHandler --> OrderRepository : uses
+CreateOrderHandler --> EventStore : uses
+CreateOrderHandler --> EventPublisher : uses
+
+CancelOrderHandler --> OrderRepository : uses
+CancelOrderHandler --> EventStore : uses
+CancelOrderHandler --> EventPublisher : uses
+
+OrderEventHandler --> OrderRepository : uses
+OrderEventHandler --> EventStore : uses
+OrderEventHandler --> EventPublisher : uses
+OrderEventHandler --> EventConsumer : uses
+
+' === СОБЫТИЯ ДРУГИХ СЕРВИСОВ ===
+class PaymentCompleted {
+  - PaymentID: UUID
+  - OrderID: UUID
+  - Amount: float64
+  - Timestamp: time.Time
+}
+
+class InventoryReserved {
+  - ReservationID: UUID
+  - OrderID: UUID
+  - ProductID: UUID
+  - Quantity: int
+  - Timestamp: time.Time
+}
+
+class PaymentFailed {
+  - PaymentID: UUID
+  - OrderID: UUID
+  - Reason: string
+  - Timestamp: time.Time
+}
+
+' === ПОЯСНЕНИЯ ===
+note right of Order
+  Агрегат Order:
+  - Восстанавливается из событий (Event Sourcing)
+  - Метод Apply(event) изменяет состояние
+  - Метод GetEvents() возвращает новые события
+  - Метод Replay(events) восстанавливает всю историю
+end note
+
+note right of OrderEventHandler
+  Обработчики событий:
+  - HandlePaymentCompleted: обновляет статус заказа на PAID
+  - HandleInventoryReserved: подтверждает резервирование
+  - HandlePaymentFailed: запускает компенсацию (OrderCancelled)
+end note
+
+note right of EventConsumer
+  Подписки:
+  - topic: payments (PaymentCompleted, PaymentFailed)
+  - topic: inventory (InventoryReserved, InventoryReleased)
+  - topic: orders (OrderCancelled)
+end note
+
+@enduml

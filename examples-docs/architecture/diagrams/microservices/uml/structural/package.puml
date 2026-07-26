@@ -1,0 +1,159 @@
+@startuml
+title Диаграмма пакетов — E‑Commerce Platform (микросервисы)
+
+' === API GATEWAY ===
+package "API Gateway" {
+    [HTTP Router]
+    [Auth Middleware]
+    [Rate Limiter]
+    [gRPC Gateway]
+}
+
+' === ORDER SERVICE ===
+package "Order Service" {
+    package "Delivery" {
+        [HTTP Handlers]
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases]
+        [Commands]
+        [Queries]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+        [Events]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [Event Store]
+        [Kafka Producer]
+        [Saga Orchestrator]
+    }
+}
+
+' === PAYMENT SERVICE ===
+package "Payment Service" {
+    package "Delivery" {
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [Payment Gateway Adapter]
+        [Kafka Producer]
+    }
+}
+
+' === INVENTORY SERVICE ===
+package "Inventory Service" {
+    package "Delivery" {
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [Kafka Producer]
+    }
+}
+
+' === USER SERVICE ===
+package "User Service" {
+    package "Delivery" {
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [JWT Manager]
+    }
+}
+
+' === NOTIFICATION SERVICE ===
+package "Notification Service" {
+    package "Delivery" {
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [Email Adapter]
+        [SMS Adapter]
+        [Push Adapter]
+        [Kafka Consumer]
+    }
+}
+
+' === SHARED ===
+package "Shared" {
+    [Domain Events]
+    [DTOs]
+    [Errors]
+    [Logger]
+    [Config]
+    [Tracing]
+}
+
+' === ЗАВИСИМОСТИ МЕЖДУ ПАКЕТАМИ ===
+"API Gateway" ..> "Order Service" : uses
+"API Gateway" ..> "Payment Service" : uses
+"API Gateway" ..> "User Service" : uses
+
+"Order Service" ..> "Shared" : uses
+"Payment Service" ..> "Shared" : uses
+"Inventory Service" ..> "Shared" : uses
+"User Service" ..> "Shared" : uses
+"Notification Service" ..> "Shared" : uses
+
+"Order Service" ..> "Payment Service" : depends (Saga)
+"Order Service" ..> "Inventory Service" : depends (Saga)
+"Order Service" ..> "Notification Service" : depends (Saga)
+
+"Order Service" --> "Shared" : (events)
+"Payment Service" --> "Shared" : (events)
+"Inventory Service" --> "Shared" : (events)
+"Notification Service" --> "Shared" : (events)
+
+' === ПОЯСНЕНИЯ ===
+note right of "Order Service"
+  Order Service:
+  - Event Sourcing + CQRS
+  - Saga Orchestrator
+  - Собственная БД (Order DB)
+  - Читает события из Kafka
+end note
+
+note right of "Shared"
+  Shared содержит:
+  - Общие события (Domain Events)
+  - DTO (Data Transfer Objects)
+  - Ошибки (Errors)
+  - Инфраструктурные утилиты (Logger, Config, Tracing)
+end note
+
+@enduml

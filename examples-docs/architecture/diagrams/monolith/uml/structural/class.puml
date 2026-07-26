@@ -1,0 +1,226 @@
+@startuml
+title Диаграмма классов — E‑Commerce Platform (модульный монолит)
+
+' === ДОМЕННЫЕ СУЩНОСТИ ===
+class User {
+  - id: UUID
+  - email: String
+  - passwordHash: String
+  - name: String
+  - role: UserRole
+  - createdAt: DateTime
+  - updatedAt: DateTime
+  + changeEmail(newEmail: String): void
+  + changePassword(newPassword: String): void
+}
+
+enum UserRole {
+  USER
+  MANAGER
+  ADMIN
+}
+
+class Product {
+  - id: UUID
+  - name: String
+  - description: String
+  - price: Money
+  - category: String
+  - stock: Integer
+  - imageUrl: String
+  - createdAt: DateTime
+  - updatedAt: DateTime
+  + reduceStock(quantity: Integer): void
+  + increaseStock(quantity: Integer): void
+}
+
+class Cart {
+  - id: UUID
+  - userId: UUID
+  - items: CartItem[]
+  - createdAt: DateTime
+  - updatedAt: DateTime
+  + addItem(product: Product, quantity: Integer): void
+  + removeItem(itemId: UUID): void
+  + updateQuantity(itemId: UUID, quantity: Integer): void
+  + getTotal(): Money
+  + clear(): void
+}
+
+class CartItem {
+  - id: UUID
+  - productId: UUID
+  - quantity: Integer
+  - price: Money
+  - createdAt: DateTime
+  - updatedAt: DateTime
+  + getTotal(): Money
+}
+
+class Order {
+  - id: UUID
+  - userId: UUID
+  - status: OrderStatus
+  - items: OrderItem[]
+  - totalAmount: Money
+  - shippingAddress: String
+  - discountCode: String
+  - paymentId: UUID
+  - createdAt: DateTime
+  - updatedAt: DateTime
+  + applyDiscount(code: String): void
+  + cancel(): void
+  + changeStatus(newStatus: OrderStatus): void
+}
+
+enum OrderStatus {
+  NEW
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+class OrderItem {
+  - id: UUID
+  - productId: UUID
+  - productName: String
+  - quantity: Integer
+  - price: Money
+  - total: Money
+  + getTotal(): Money
+}
+
+class Payment {
+  - id: UUID
+  - orderId: UUID
+  - amount: Money
+  - method: PaymentMethod
+  - status: PaymentStatus
+  - transactionId: String
+  - externalData: Json
+  - createdAt: DateTime
+  - updatedAt: DateTime
+  + confirm(): void
+  + refund(): void
+  + fail(): void
+}
+
+enum PaymentMethod {
+  CARD
+  SBP
+  PAYPAL
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+' === АГРЕГАТЫ ДЛЯ EVENT SOURCING ===
+class OrderAggregate {
+  - id: UUID
+  - status: OrderStatus
+  - items: OrderItem[]
+  - version: Integer
+  + Apply(event: Event): void
+  + Replay(events: Event[]): void
+  + CreateOrder(customerId: UUID, items: OrderItem[]): OrderCreated
+  + MarkAsPaid(paymentId: UUID): OrderPaid
+  + Ship(): OrderShipped
+  + Deliver(): OrderDelivered
+  + Cancel(): OrderCancelled
+}
+
+class Event {
+  + getAggregateId(): UUID
+  + getTimestamp(): DateTime
+  + getType(): String
+  + getVersion(): Integer
+}
+
+class OrderCreated {
+  - aggregateId: UUID
+  - customerId: UUID
+  - items: OrderItem[]
+  - totalAmount: Money
+  - timestamp: DateTime
+}
+
+class OrderPaid {
+  - aggregateId: UUID
+  - paymentId: UUID
+  - amount: Money
+  - timestamp: DateTime
+}
+
+' === СЕРВИСЫ (Use Cases) ===
+class OrderService {
+  - repository: OrderRepository
+  - eventStore: EventStore
+  - eventBus: EventPublisher
+  + CreateOrder(command: CreateOrderCommand): Order
+  + CancelOrder(command: CancelOrderCommand): void
+  + GetOrder(query: GetOrderQuery): Order
+  + ListOrders(query: ListOrdersQuery): Order[]
+}
+
+class PaymentService {
+  - repository: PaymentRepository
+  - gateway: PaymentGateway
+  - eventBus: EventPublisher
+  + InitiatePayment(command: InitiatePaymentCommand): Payment
+  + ConfirmPayment(command: ConfirmPaymentCommand): void
+  + RefundPayment(command: RefundPaymentCommand): void
+  + GetPaymentStatus(query: GetPaymentStatusQuery): PaymentStatus
+}
+
+class ProductService {
+  - repository: ProductRepository
+  - eventBus: EventPublisher
+  + GetProduct(query: GetProductQuery): Product
+  + ListProducts(query: ListProductsQuery): Product[]
+  + UpdateStock(command: UpdateStockCommand): void
+  + ReserveStock(command: ReserveStockCommand): Reservation
+  + ReleaseStock(command: ReleaseStockCommand): void
+}
+
+' === РЕПОЗИТОРИИ (интерфейсы) ===
+interface OrderRepository {
+  + Save(order: Order): void
+  + FindById(id: UUID): Order
+  + FindAll(filter: OrderFilter): Order[]
+}
+
+interface EventStore {
+  + Save(aggregateId: UUID, events: Event[]): void
+  + Load(aggregateId: UUID): Event[]
+}
+
+interface EventPublisher {
+  + Publish(event: Event): void
+}
+
+' === СВЯЗИ ===
+Order "1" *-- "0..*" OrderItem : contains
+Order "0..*" -- "1" User : belongs to
+Order "1" -- "0..1" Payment : has
+Cart "1" *-- "0..*" CartItem : contains
+Cart "1" -- "1" User : belongs to
+Product "1" -- "0..*" CartItem : referenced in
+Product "1" -- "0..*" OrderItem : referenced in
+
+OrderAggregate -- Order : corresponds to
+OrderAggregate -- OrderCreated : produces
+OrderAggregate -- OrderPaid : produces
+
+OrderService --> OrderRepository : uses
+OrderService --> EventStore : uses
+OrderService --> EventPublisher : uses
+PaymentService --> PaymentGateway : uses
+PaymentService --> EventPublisher : uses
+ProductService --> ProductRepository : uses
+
+@enduml

@@ -1,0 +1,166 @@
+@startuml
+title C4-уровень Code — Order Service (Event‑Driven, Go)
+
+' === ДОМЕН (Domain) ===
+class Order {
+  - ID: uuid.UUID
+  - CustomerID: uuid.UUID
+  - Status: OrderStatus
+  - Items: []OrderItem
+  - TotalAmount: float64
+  - ShippingAddress: string
+  - CreatedAt: time.Time
+  - UpdatedAt: time.Time
+  + Apply(event Event): void
+  + GetEvent(): Event
+  + Replay(events []Event): void
+}
+
+enum OrderStatus {
+  NEW
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+class OrderItem {
+  - ProductID: uuid.UUID
+  - ProductName: string
+  - Quantity: int
+  - Price: float64
+  - Total: float64
+}
+
+' === СОБЫТИЯ ===
+class OrderCreated {
+  + OrderID: uuid.UUID
+  + CustomerID: uuid.UUID
+  + Items: []OrderItem
+  + TotalAmount: float64
+  + Timestamp: time.Time
+}
+
+class OrderPaid {
+  + OrderID: uuid.UUID
+  + PaymentID: uuid.UUID
+  + Timestamp: time.Time
+}
+
+class OrderCancelled {
+  + OrderID: uuid.UUID
+  + Reason: string
+  + Timestamp: time.Time
+}
+
+' === ИНТЕРФЕЙСЫ (Ports) ===
+interface OrderRepository {
+  + Save(ctx context.Context, order *Order): error
+  + FindByID(ctx context.Context, id uuid.UUID): (*Order, error)
+  + FindAll(ctx context.Context, filter Filter): ([]*Order, error)
+}
+
+interface EventStore {
+  + Save(aggregateID string, events ...Event): error
+  + Load(aggregateID string): ([]Event, error)
+}
+
+interface EventPublisher {
+  + Publish(ctx context.Context, event Event): error
+}
+
+interface EventConsumer {
+  + Subscribe(topic string, handler func(Event) error): error
+}
+
+' === USE CASES ===
+class CreateOrderUseCase {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventPublisher: EventPublisher
+  + Execute(ctx context.Context, cmd CreateOrderCommand): (*Order, error)
+}
+
+class CancelOrderUseCase {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventPublisher: EventPublisher
+  + Execute(ctx context.Context, cmd CancelOrderCommand): error
+}
+
+class OrderEventHandler {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventPublisher: EventPublisher
+  + HandlePaymentCompleted(event PaymentCompleted): error
+  + HandleInventoryReserved(event InventoryReserved): error
+}
+
+' === АДАПТЕРЫ ===
+class PostgresOrderRepository {
+  - db: *sql.DB
+  + Save(ctx context.Context, order *Order): error
+  + FindByID(ctx context.Context, id uuid.UUID): (*Order, error)
+  + FindAll(ctx context.Context, filter Filter): ([]*Order, error)
+}
+
+class PostgresEventStore {
+  - db: *sql.DB
+  + Save(aggregateID string, events ...Event): error
+  + Load(aggregateID string): ([]Event, error)
+}
+
+class KafkaEventPublisher {
+  - producer: sarama.SyncProducer
+  + Publish(ctx context.Context, event Event): error
+}
+
+class KafkaEventConsumer {
+  - consumer: sarama.ConsumerGroup
+  + Subscribe(topic string, handler func(Event) error): error
+}
+
+' === ЗАВИСИМОСТИ ===
+Order "1" *-- "0..*" OrderItem : contains
+Order "1" -- "1..*" Event : generates
+
+OrderRepository <|.. PostgresOrderRepository : implements
+EventStore <|.. PostgresEventStore : implements
+EventPublisher <|.. KafkaEventPublisher : implements
+EventConsumer <|.. KafkaEventConsumer : implements
+
+CreateOrderUseCase --> OrderRepository : uses
+CreateOrderUseCase --> EventStore : uses
+CreateOrderUseCase --> EventPublisher : uses
+
+OrderEventHandler --> OrderRepository : uses
+OrderEventHandler --> EventStore : uses
+OrderEventHandler --> EventPublisher : uses
+
+OrderEventHandler --> EventConsumer : subscribes
+
+' === ПОЯСНЕНИЯ ===
+note bottom of Order
+  Агрегат Order:
+  - Восстанавливается из событий (Event Sourcing)
+  - Метод Apply(event) изменяет состояние
+  - Метод GetEvent() возвращает новое событие
+  - Метод Replay(events) восстанавливает всю историю
+end note
+
+note bottom of OrderEventHandler
+  Обработчики событий:
+  - HandlePaymentCompleted: обновляет статус заказа на PAID
+  - HandleInventoryReserved: подтверждает резервирование
+  - HandlePaymentFailed: запускает компенсацию (OrderCancelled)
+  - HandleOrderCancelled: компенсация (отмена платежа, освобождение товаров)
+end note
+
+note bottom of KafkaEventConsumer
+  Подписки:
+  - topic: payments (PaymentCompleted, PaymentFailed)
+  - topic: inventory (InventoryReserved, InventoryReleased)
+  - topic: orders (OrderCancelled)
+end note
+
+@enduml

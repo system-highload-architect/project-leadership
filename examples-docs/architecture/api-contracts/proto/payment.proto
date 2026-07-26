@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package payment.v1;
+
+service PaymentService {
+  // Команды
+  rpc InitiatePayment(InitiatePaymentRequest) returns (InitiatePaymentResponse);
+  rpc ConfirmPayment(ConfirmPaymentRequest) returns (ConfirmPaymentResponse);
+  rpc RefundPayment(RefundPaymentRequest) returns (RefundPaymentResponse);
+  
+  // Запросы
+  rpc GetPaymentStatus(GetPaymentStatusRequest) returns (PaymentStatus);
+}
+
+message Payment {
+  string id = 1;
+  string order_id = 2;
+  double amount = 3;
+  string method = 4; // CARD, SBP, PAYPAL
+  string status = 5; // PENDING, SUCCESS, FAILED, REFUNDED
+  string transaction_id = 6;
+  string created_at = 7;
+}
+
+message InitiatePaymentRequest {
+  string order_id = 1;
+  string method = 2;
+  string card_token = 3; // для CARD
+}
+
+message InitiatePaymentResponse {
+  string payment_id = 1;
+  string status = 2;
+  string redirect_url = 3; // для внешних шлюзов
+}
+
+message ConfirmPaymentRequest {
+  string payment_id = 1;
+  string confirmation_code = 2; // например, 3DSecure
+}
+
+message ConfirmPaymentResponse {
+  bool success = 1;
+}
+
+message RefundPaymentRequest {
+  string payment_id = 1;
+  double amount = 2;
+}
+
+message RefundPaymentResponse {
+  bool success = 1;
+}
+
+message GetPaymentStatusRequest {
+  string payment_id = 1;
+}
+
+message PaymentStatus {
+  string payment_id = 1;
+  string status = 2;
+  string message = 3;
+}

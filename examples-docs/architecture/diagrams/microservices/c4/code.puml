@@ -1,0 +1,190 @@
+@startuml
+title C4-уровень Code — Order Service (микросервис, Go)
+
+' === ДОМЕН (Domain) ===
+class Order {
+  - ID: uuid.UUID
+  - CustomerID: uuid.UUID
+  - Status: OrderStatus
+  - Items: []OrderItem
+  - TotalAmount: float64
+  - ShippingAddress: string
+  - CreatedAt: time.Time
+  - UpdatedAt: time.Time
+  + Apply(event Event): void
+  + GetEvent(): Event
+  + Replay(events []Event): void
+}
+
+enum OrderStatus {
+  NEW
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+class OrderItem {
+  - ProductID: uuid.UUID
+  - ProductName: string
+  - Quantity: int
+  - Price: float64
+  - Total: float64
+}
+
+' === ИНТЕРФЕЙСЫ (Ports) ===
+interface OrderRepository {
+  + Save(ctx context.Context, order *Order): error
+  + FindByID(ctx context.Context, id uuid.UUID): (*Order, error)
+  + FindAll(ctx context.Context, filter Filter): ([]*Order, error)
+}
+
+interface EventStore {
+  + Save(aggregateID string, events ...Event): error
+  + Load(aggregateID string): ([]Event, error)
+}
+
+interface EventPublisher {
+  + Publish(ctx context.Context, event Event): error
+}
+
+interface SagaOrchestrator {
+  + StartSaga(ctx context.Context, sagaType string, data map[string]interface{}) error
+  + GetSagaStatus(ctx context.Context, sagaID string) (*SagaState, error)
+}
+
+interface ExternalServiceClient {
+  + ProcessPayment(ctx context.Context, req PaymentRequest) (*PaymentResponse, error)
+  + ReserveStock(ctx context.Context, req ReserveRequest) (*ReserveResponse, error)
+  + SendNotification(ctx context.Context, req NotificationRequest) error
+}
+
+' === USE CASES (Application Layer) ===
+class CreateOrderUseCase {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventBus: EventPublisher
+  - sagaOrchestrator: SagaOrchestrator
+  + Execute(ctx context.Context, cmd CreateOrderCommand): (*Order, error)
+}
+
+class CancelOrderUseCase {
+  - repo: OrderRepository
+  - eventStore: EventStore
+  - eventBus: EventPublisher
+  - sagaOrchestrator: SagaOrchestrator
+  + Execute(ctx context.Context, cmd CancelOrderCommand): error
+}
+
+class GetOrderUseCase {
+  - repo: OrderRepository
+  + Execute(ctx context.Context, query GetOrderQuery): (*Order, error)
+}
+
+class ListOrdersUseCase {
+  - repo: OrderRepository
+  + Execute(ctx context.Context, query ListOrdersQuery): ([]*Order, error)
+}
+
+' === АДАПТЕРЫ (Adapters) ===
+class PostgresOrderRepository {
+  - db: *sql.DB
+  + Save(ctx context.Context, order *Order): error
+  + FindByID(ctx context.Context, id uuid.UUID): (*Order, error)
+  + FindAll(ctx context.Context, filter Filter): ([]*Order, error)
+}
+
+class PostgresEventStore {
+  - db: *sql.DB
+  + Save(aggregateID string, events ...Event): error
+  + Load(aggregateID string): ([]Event, error)
+}
+
+class KafkaEventPublisher {
+  - producer: sarama.SyncProducer
+  + Publish(ctx context.Context, event Event): error
+}
+
+class SagaOrchestratorImpl {
+  - db: *sql.DB
+  - clients: map[string]ExternalServiceClient
+  + StartSaga(ctx context.Context, sagaType string, data map[string]interface{}) error
+  + GetSagaStatus(ctx context.Context, sagaID string) (*SagaState, error)
+}
+
+class PaymentServiceClient {
+  - grpcClient: paymentv1.PaymentServiceClient
+  + ProcessPayment(ctx context.Context, req PaymentRequest) (*PaymentResponse, error)
+}
+
+class InventoryServiceClient {
+  - grpcClient: inventoryv1.InventoryServiceClient
+  + ReserveStock(ctx context.Context, req ReserveRequest) (*ReserveResponse, error)
+}
+
+class NotificationServiceClient {
+  - grpcClient: notificationv1.NotificationServiceClient
+  + SendNotification(ctx context.Context, req NotificationRequest) error
+}
+
+' === ЗАВИСИМОСТИ ===
+Order "1" *-- "0..*" OrderItem : contains
+
+OrderRepository <|.. PostgresOrderRepository : implements
+EventStore <|.. PostgresEventStore : implements
+EventPublisher <|.. KafkaEventPublisher : implements
+SagaOrchestrator <|.. SagaOrchestratorImpl : implements
+ExternalServiceClient <|.. PaymentServiceClient : implements
+ExternalServiceClient <|.. InventoryServiceClient : implements
+ExternalServiceClient <|.. NotificationServiceClient : implements
+
+CreateOrderUseCase --> OrderRepository : uses
+CreateOrderUseCase --> EventStore : uses
+CreateOrderUseCase --> EventPublisher : uses
+CreateOrderUseCase --> SagaOrchestrator : uses
+
+CancelOrderUseCase --> OrderRepository : uses
+CancelOrderUseCase --> EventStore : uses
+CancelOrderUseCase --> EventPublisher : uses
+CancelOrderUseCase --> SagaOrchestrator : uses
+
+GetOrderUseCase --> OrderRepository : uses
+ListOrdersUseCase --> OrderRepository : uses
+
+SagaOrchestratorImpl --> ExternalServiceClient : uses
+
+' === ПОЯСНЕНИЯ ===
+note bottom of Order
+  Агрегат Order:
+  - Восстанавливается из событий (Event Sourcing)
+  - Метод Apply(event) изменяет состояние
+  - Метод GetEvent() возвращает новое событие
+  - Метод Replay(events) восстанавливает всю историю
+end note
+
+note bottom of CreateOrderUseCase
+  Use Case: создание заказа
+  1. Создаёт агрегат Order
+  2. Получает событие OrderCreated
+  3. Сохраняет событие в Event Store
+  4. Публикует событие в Kafka
+  5. Запускает Saga (платёж → резервирование → уведомление)
+end note
+
+note bottom of SagaOrchestratorImpl
+  Saga Orchestrator:
+  - Координирует распределённые транзакции
+  - Сохраняет состояние Saga в PostgreSQL
+  - При ошибке запускает компенсацию (обратный порядок)
+  - Асинхронная обработка (eventual consistency)
+end note
+
+note bottom of KafkaEventPublisher
+  Kafka топики:
+  - orders (OrderCreated, OrderPaid, OrderShipped, OrderCancelled)
+  - payments (PaymentCompleted, PaymentFailed)
+  - inventory (InventoryReserved, InventoryReleased)
+  - notifications (OrderConfirmation, OrderCancellation)
+end note
+
+@enduml

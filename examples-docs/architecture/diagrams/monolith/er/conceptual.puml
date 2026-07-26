@@ -1,0 +1,26 @@
+@startuml
+title Концептуальная ER-диаграмма — E‑Commerce Platform (модульный монолит)
+
+' === СУЩНОСТИ ===
+entity "Пользователь" as user
+entity "Товар" as product
+entity "Корзина" as cart
+entity "Позиция корзины" as cart_item
+entity "Заказ" as order
+entity "Позиция заказа" as order_item
+entity "Платёж" as payment
+entity "Событие" as event
+entity "Сага" as saga
+
+' === СВЯЗИ ===
+user ||--o{ cart : "имеет"
+cart ||--|{ cart_item : "содержит"
+product ||--o{ cart_item : "участвует в"
+user ||--o{ order : "создаёт"
+order ||--|{ order_item : "содержит"
+product ||--o{ order_item : "участвует в"
+order ||--o{ payment : "имеет"
+order ||--o{ event : "порождает"
+order ||--o{ saga : "управляется"
+
+@enduml

@@ -1,0 +1,55 @@
+@startuml
+title C4-уровень Code — Notification Function (Serverless)
+
+allowmixing
+
+' === КОМПОНЕНТЫ ===
+component "Lambda Handler" as handler
+component "Event Processor" as processor
+component "Domain" as domain
+component "Sender" as sender
+
+' === АДАПТЕРЫ ===
+component "Email Adapter" as email_adapter
+component "SMS Adapter" as sms_adapter
+component "Push Adapter" as push_adapter
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+cloud "Kafka" as kafka
+cloud "Email Service" as email_service
+cloud "SMS Service" as sms_service
+cloud "Push Service" as push_service
+
+' === СВЯЗИ ===
+handler --> processor : "вызывает"
+processor --> domain : "использует"
+processor --> sender : "вызывает"
+
+sender --> email_adapter : "использует"
+sender --> sms_adapter : "использует"
+sender --> push_adapter : "использует"
+
+email_adapter --> email_service : "отправляет (SMTP/HTTP)"
+sms_adapter --> sms_service : "отправляет (HTTP)"
+push_adapter --> push_service : "отправляет (HTTP)"
+
+kafka --> handler : "триггерит (Kafka Protocol)"
+
+' === ПОЯСНЕНИЯ ===
+note right of handler
+  Lambda handler:
+  - Запускается по событию из Kafka
+  - Имеет ограничение по времени (15 мин)
+  - Масштабируется автоматически
+  - Оплата за выполнение
+end note
+
+note right of processor
+  Event Processor:
+  - Парсит событие (OrderCreated, PaymentCompleted, etc.)
+  - Определяет тип уведомления (email, SMS, push)
+  - Формирует шаблон уведомления
+  - Вызывает Sender
+end note
+
+@enduml

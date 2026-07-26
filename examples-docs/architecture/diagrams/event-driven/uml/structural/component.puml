@@ -1,0 +1,151 @@
+@startuml
+title Диаграмма компонентов — E‑Commerce Platform (Event‑Driven)
+
+' === API GATEWAY ===
+component "API Gateway" as gateway {
+    [HTTP Router]
+    [Auth Middleware]
+    [Rate Limiter]
+    [Command Publisher]
+}
+
+' === KAFKA (центральная шина) ===
+component "Kafka" as kafka {
+    [orders topic]
+    [payments topic]
+    [inventory topic]
+    [notifications topic]
+}
+
+' === ORDER SERVICE ===
+component "Order Service" as order {
+    [Delivery Layer]
+    [Use Cases (Command Handlers)]
+    [Event Handlers (Subscribers)]
+    [Domain]
+    [Event Sourcing]
+    [Projection Service]
+}
+
+interface "IOrderCommands" as IOrderCommands
+interface "IOrderEvents" as IOrderEvents
+
+order --> IOrderCommands : provides (commands)
+order --> IOrderEvents : provides (events)
+
+' === PAYMENT SERVICE ===
+component "Payment Service" as payment {
+    [Delivery Layer]
+    [Use Cases]
+    [Event Handlers]
+    [Domain]
+    [Payment Gateway Adapter]
+}
+
+interface "IPaymentCommands" as IPaymentCommands
+interface "IPaymentEvents" as IPaymentEvents
+
+payment --> IPaymentCommands : provides
+payment --> IPaymentEvents : provides
+
+' === INVENTORY SERVICE ===
+component "Inventory Service" as inventory {
+    [Delivery Layer]
+    [Use Cases]
+    [Event Handlers]
+    [Domain]
+    [Stock Manager]
+    [Reservation Manager]
+}
+
+interface "IInventoryCommands" as IInventoryCommands
+interface "IInventoryEvents" as IInventoryEvents
+
+inventory --> IInventoryCommands : provides
+inventory --> IInventoryEvents : provides
+
+' === USER SERVICE ===
+component "User Service" as user {
+    [Delivery Layer]
+    [Use Cases]
+    [Event Handlers]
+    [Domain]
+    [Authentication]
+}
+
+interface "IUserCommands" as IUserCommands
+interface "IUserEvents" as IUserEvents
+
+user --> IUserCommands : provides
+user --> IUserEvents : provides
+
+' === NOTIFICATION SERVICE ===
+component "Notification Service" as notification {
+    [Delivery Layer]
+    [Use Cases]
+    [Event Handlers]
+    [Domain]
+    [Channel Adapters]
+}
+
+interface "INotificationCommands" as INotificationCommands
+interface "INotificationEvents" as INotificationEvents
+
+notification --> INotificationCommands : provides
+notification --> INotificationEvents : provides
+
+' === БАЗЫ ДАННЫХ (каждый сервис) ===
+component "Order DB" as order_db
+component "Payment DB" as payment_db
+component "Inventory DB" as inventory_db
+component "User DB" as user_db
+component "Notification DB" as notification_db
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+component "Payment Gateway (External)" as payment_gateway
+component "Delivery Service (External)" as delivery_service
+
+' === СВЯЗИ: API Gateway → Kafka ===
+gateway --> kafka : publishes commands (CreateOrder, CancelOrder, etc.)
+
+' === СВЯЗИ: Kafka → Сервисы (доставка событий) ===
+kafka --> order : delivers events (PaymentCompleted, InventoryReserved)
+kafka --> payment : delivers events (OrderCreated)
+kafka --> inventory : delivers events (OrderCreated, OrderCancelled)
+kafka --> notification : delivers events (OrderCreated, PaymentCompleted, OrderCancelled)
+
+' === СВЯЗИ: Сервисы → Kafka (публикация событий) ===
+order --> kafka : publishes events (OrderCreated, OrderPaid, OrderShipped, OrderCancelled)
+payment --> kafka : publishes events (PaymentCompleted, PaymentFailed)
+inventory --> kafka : publishes events (InventoryReserved, InventoryReleased)
+user --> kafka : publishes events (UserRegistered, UserUpdated)
+notification --> kafka : publishes events (NotificationSent)
+
+' === СВЯЗИ: Сервисы → Базы данных ===
+order --> order_db : uses (SQL)
+payment --> payment_db : uses (SQL)
+inventory --> inventory_db : uses (SQL)
+user --> user_db : uses (SQL)
+notification --> notification_db : uses (SQL)
+
+' === ВНЕШНИЕ СВЯЗИ ===
+payment --> payment_gateway : uses (HTTPS)
+order --> delivery_service : uses (HTTPS)
+
+' === ПОЯСНЕНИЯ ===
+note right of kafka
+  Kafka — центральная шина событий:
+  - Все коммуникации между сервисами происходят через события
+  - Нет прямых синхронных вызовов между сервисами
+  - События хранятся для replay
+  - Поддерживает eventual consistency
+end note
+
+note right of order
+  Order Service:
+  - Event Sourcing + CQRS
+  - Подписчик на PaymentCompleted и InventoryReserved
+  - Публикует события жизненного цикла заказа
+end note
+
+@enduml

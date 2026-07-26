@@ -1,0 +1,47 @@
+@startuml
+title Диаграмма коммуникации — Создание заказа (микросервисы)
+
+actor Customer
+participant "Web UI" as UI
+participant "API Gateway" as Gateway
+participant "Order Service" as Order
+participant "Payment Service" as Payment
+participant "Inventory Service" as Inventory
+participant "Notification Service" as Notification
+participant "Kafka" as Kafka
+participant "Payment Gateway" as PaymentGateway
+
+Customer --> UI : 1. Оформляет заказ
+UI --> Gateway : 2. POST /orders
+Gateway --> Order : 3. CreateOrder (gRPC)
+
+Order -> Order : 4. Создаёт агрегат Order (NEW)
+Order -> Order : 5. Сохраняет OrderCreated в Event Store
+Order --> Kafka : 6. Публикует OrderCreated
+
+Order --> Payment : 7. ProcessPayment (Saga шаг 1)
+Payment -> Payment : 8. Создаёт платёж (PENDING)
+Payment --> PaymentGateway : 9. Authorize payment
+PaymentGateway --> Payment : 10. Payment success
+Payment -> Payment : 11. Обновляет статус на SUCCESS
+Payment --> Kafka : 12. Публикует PaymentCompleted
+Payment --> Order : 13. Payment completed
+
+Order --> Inventory : 14. ReserveStock (Saga шаг 2)
+Inventory -> Inventory : 15. Проверяет остатки
+Inventory -> Inventory : 16. Резервирует товары
+Inventory --> Kafka : 17. Публикует InventoryReserved
+Inventory --> Order : 18. Stock reserved
+
+Order --> Notification : 19. SendOrderConfirmation (Saga шаг 3)
+Notification -> Notification : 20. Формирует уведомление
+Notification --> Kafka : 21. Публикует NotificationRequest
+Notification --> Order : 22. Notification sent
+
+Order -> Order : 23. Обновляет статус на PAID
+Order --> Kafka : 24. Публикует OrderPaid
+Order --> Gateway : 25. Order created
+Gateway --> UI : 26. 202 Accepted
+UI --> Customer : 27. Заказ создан
+
+@enduml

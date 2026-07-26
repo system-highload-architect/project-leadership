@@ -1,0 +1,72 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+title Диаграмма компонентов — Order Service (модуль внутри монолита)
+
+Container(backend, "Backend (модульный монолит)", "Go", "Бизнес-логика")
+
+' === КОМПОНЕНТЫ (Clean Architecture) ===
+Component(delivery, "Delivery Layer", "Gin / gRPC", "Обрабатывает HTTP/gRPC-запросы, валидация, маршрутизация")
+
+Component(usecase, "Use Cases", "Go", "Бизнес-логика: создание, отмена, изменение статуса заказа")
+Component(domain, "Domain", "Go", "Сущности (Order, OrderItem), правила, Value Objects")
+
+Component(repo_port, "Repository Port", "Go interface", "Интерфейс доступа к данным (Write + Read)")
+Component(event_port, "Event Publisher Port", "Go interface", "Интерфейс публикации событий")
+
+Component(postgres_adapter, "Postgres Adapter", "Go + pgx", "Реализация репозитория (Write DB, Read DB, Event Store)")
+Component(kafka_adapter, "Kafka Adapter", "Go + Sarama", "Публикация событий в Kafka")
+
+Component(event_sourcing, "Event Sourcing", "Go", "Хранит/восстанавливает агрегаты из Event Store")
+Component(projection, "Projection Service", "Go", "Строит read-модели из событий (CQRS)")
+
+' === СВЯЗИ ===
+Rel(delivery, usecase, "Вызывает", "зависит")
+Rel(usecase, domain, "Использует", "зависит")
+Rel(usecase, repo_port, "Вызывает", "зависит (интерфейс)")
+Rel(usecase, event_port, "Вызывает", "зависит (интерфейс)")
+
+Rel(postgres_adapter, repo_port, "Реализует", "реализует интерфейс")
+Rel(kafka_adapter, event_port, "Реализует", "реализует интерфейс")
+
+Rel(usecase, event_sourcing, "Использует", "зависит")
+Rel(event_sourcing, postgres_adapter, "Сохраняет/читает события", "SQL")
+Rel(projection, postgres_adapter, "Записывает read-модели", "SQL")
+Rel(projection, kafka_adapter, "Подписывается на события", "Kafka")
+
+' === ПОЯСНЕНИЯ ===
+note right of usecase
+  Use Cases:
+  - CreateOrder
+  - CancelOrder
+  - UpdateOrderStatus
+  - GetOrder
+  - ListOrders
+end note
+
+note right of event_sourcing
+  Event Sourcing:
+  - Сохраняет события в Event Store
+  - Восстанавливает агрегаты из событий
+  - Использует снапшоты для ускорения
+end note
+
+note right of projection
+  Projection Service:
+  - Строит read-модели для CQRS
+  - Обновляется асинхронно через Kafka
+  - Пишет в Read DB (денормализованные таблицы)
+end note
+
+' === СВЯЗЬ С ДРУГИМИ МОДУЛЯМИ ===
+note left of delivery
+  Аналогичная структура для модулей:
+  - Product
+  - Payment
+  - User
+  - Notification
+  Каждый модуль имеет свои Use Cases и Domain.
+end note
+
+@enduml

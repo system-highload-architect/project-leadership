@@ -1,0 +1,63 @@
+@startuml
+title Концептуальная ER-диаграмма — E‑Commerce Platform (Event‑Driven)
+
+' ===== ORDER SERVICE =====
+entity "Заказ" as order
+entity "Позиция заказа" as order_item
+entity "Событие заказа" as order_event
+entity "Сага" as saga
+
+' ===== PAYMENT SERVICE =====
+entity "Платёж" as payment
+entity "Событие платежа" as payment_event
+
+' ===== INVENTORY SERVICE =====
+entity "Товар" as product
+entity "Остаток" as stock
+entity "Резервирование" as reservation
+entity "Событие инвентаризации" as inventory_event
+
+' ===== USER SERVICE =====
+entity "Пользователь" as user
+entity "Событие пользователя" as user_event
+
+' ===== NOTIFICATION SERVICE =====
+entity "Уведомление" as notification
+entity "Событие уведомления" as notification_event
+
+' === СВЯЗИ ВНУТРИ СЕРВИСОВ ===
+order ||--|{ order_item : "содержит"
+order ||--o{ order_event : "порождает"
+order ||--o{ saga : "управляется"
+
+payment ||--o{ payment_event : "порождает"
+
+product ||--o{ stock : "имеет"
+stock ||--o{ reservation : "участвует в"
+product ||--o{ inventory_event : "порождает"
+
+user ||--o{ user_event : "порождает"
+
+notification ||--o{ notification_event : "порождает"
+
+' === ПОЯСНЕНИЯ ===
+note right of order_event
+  Event Store для Order Service:
+  - Все изменения заказа хранятся как события
+  - События — источник истины
+  - Используется для Event Sourcing
+end note
+
+note right of payment_event
+  Payment Service также хранит события:
+  - PaymentInitiated, PaymentCompleted, PaymentFailed
+  - Используется для аудита и восстановления
+end note
+
+note right of inventory_event
+  Inventory Service хранит события:
+  - StockReserved, StockReleased, StockUpdated
+  - Используется для аудита и синхронизации
+end note
+
+@enduml

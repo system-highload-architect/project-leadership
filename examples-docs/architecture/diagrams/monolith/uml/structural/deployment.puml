@@ -1,0 +1,62 @@
+@startuml
+title Диаграмма развёртывания — модуль Order Service (Kubernetes)
+
+' === NODES ===
+node "Kubernetes Cluster" as Cluster {
+  node "Ingress Controller" as Ingress {
+    artifact "nginx.conf" as NginxConf
+  }
+  
+  node "Frontend Pod" as FrontendPod {
+    artifact "frontend:latest" as FrontendArtifact
+  }
+  
+  node "Backend Pod" as BackendPod {
+    artifact "backend:latest" as BackendArtifact
+  }
+  
+  node "PostgreSQL Pod (Write)" as WriteDBPod {
+    artifact "postgres:15" as WriteArtifact
+  }
+  
+  node "PostgreSQL Pod (Read)" as ReadDBPod {
+    artifact "postgres:15" as ReadArtifact
+  }
+  
+  node "PostgreSQL Pod (Event Store)" as EventStorePod {
+    artifact "postgres:15" as EventArtifact
+  }
+  
+  node "Kafka Pod" as KafkaPod {
+    artifact "kafka:3.x" as KafkaArtifact
+  }
+}
+
+' === ARTEFACTS ===
+artifact "openapi.yaml" as OpenAPI
+artifact "order.proto" as OrderProto
+artifact "k8s/deployment.yaml" as DeploymentYaml
+artifact "k8s/service.yaml" as ServiceYaml
+
+' === DEPLOYMENT ===
+OpenAPI -- Ingress : config
+OrderProto -- BackendPod : config
+DeploymentYaml -- BackendPod : manifest
+ServiceYaml -- BackendPod : manifest
+
+BackendArtifact -- BackendPod : deployed
+FrontendArtifact -- FrontendPod : deployed
+WriteArtifact -- WriteDBPod : deployed
+ReadArtifact -- ReadDBPod : deployed
+EventArtifact -- EventStorePod : deployed
+KafkaArtifact -- KafkaPod : deployed
+
+' === COMMUNICATION PATHS ===
+FrontendPod --> Ingress : HTTP
+Ingress --> BackendPod : gRPC/HTTP
+BackendPod --> WriteDBPod : SQL
+BackendPod --> ReadDBPod : SQL
+BackendPod --> EventStorePod : SQL
+BackendPod --> KafkaPod : Kafka Protocol
+
+@enduml

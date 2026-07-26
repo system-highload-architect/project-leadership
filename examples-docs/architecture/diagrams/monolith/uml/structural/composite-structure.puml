@@ -1,0 +1,47 @@
+@startuml
+' Composite Structure Diagram — Order Service (Monolith)
+' Требуется allowmixing для смешивания классов и других элементов
+
+allowmixing
+
+class Order {
+  - id: UUID
+  - status: OrderStatus
+  - items: OrderItem[]
+  - total: Money
+}
+
+class OrderItem {
+  - productId: UUID
+  - quantity: int
+  - price: Money
+}
+
+class DeliveryInfo {
+  - address: String
+  - trackingNumber: String
+  - estimatedDelivery: Date
+}
+
+class PaymentInfo {
+  - method: PaymentMethod
+  - amount: Money
+  - status: PaymentStatus
+}
+
+' Композиционные связи
+Order *-- "1..*" OrderItem : contains
+Order *-- "0..1" DeliveryInfo : has
+Order *-- "0..1" PaymentInfo : has
+
+' Порт OrderPort (эмуляция через класс)
+class OrderPort <<port>> {
+  + submit(): void
+  + cancel(): void
+  + getStatus(): OrderStatus
+}
+
+' Связь порта с заказом
+OrderPort -- Order : delegates
+
+@enduml

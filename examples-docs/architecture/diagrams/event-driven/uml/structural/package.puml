@@ -1,0 +1,174 @@
+@startuml
+title Диаграмма пакетов — E‑Commerce Platform (Event‑Driven)
+
+' === API GATEWAY ===
+package "API Gateway" {
+    [HTTP Router]
+    [Auth Middleware]
+    [Rate Limiter]
+    [Command Publisher (Kafka)]
+}
+
+' === SHARED ===
+package "Shared" {
+    [Domain Events]
+    [Commands]
+    [DTOs]
+    [Errors]
+    [Logger]
+    [Config]
+    [Tracing]
+}
+
+' === ORDER SERVICE ===
+package "Order Service" {
+    package "Delivery" {
+        [HTTP Handlers]
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases (Command Handlers)]
+        [Event Handlers (Subscribers)]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+        [Events]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [Event Store]
+        [Kafka Producer]
+        [Kafka Consumer]
+    }
+}
+
+' === PAYMENT SERVICE ===
+package "Payment Service" {
+    package "Delivery" {
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases]
+        [Event Handlers]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+        [Events]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [Payment Gateway Adapter]
+        [Kafka Producer]
+        [Kafka Consumer]
+    }
+}
+
+' === INVENTORY SERVICE ===
+package "Inventory Service" {
+    package "Delivery" {
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases]
+        [Event Handlers]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+        [Events]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [Kafka Producer]
+        [Kafka Consumer]
+    }
+}
+
+' === USER SERVICE ===
+package "User Service" {
+    package "Delivery" {
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases]
+        [Event Handlers]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+        [Events]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [JWT Manager]
+        [Kafka Producer]
+        [Kafka Consumer]
+    }
+}
+
+' === NOTIFICATION SERVICE ===
+package "Notification Service" {
+    package "Delivery" {
+        [gRPC Server]
+    }
+    package "Application" {
+        [Use Cases]
+        [Event Handlers]
+    }
+    package "Domain" {
+        [Entities]
+        [Value Objects]
+        [Events]
+    }
+    package "Infrastructure" {
+        [Repositories]
+        [Email Adapter]
+        [SMS Adapter]
+        [Push Adapter]
+        [Kafka Producer]
+        [Kafka Consumer]
+    }
+}
+
+' === KAFKA (внешняя шина) ===
+package "Kafka" {
+    [orders topic]
+    [payments topic]
+    [inventory topic]
+    [notifications topic]
+}
+
+' === ЗАВИСИМОСТИ МЕЖДУ ПАКЕТАМИ ===
+"API Gateway" ..> "Shared" : uses
+"API Gateway" ..> "Kafka" : publishes commands
+
+"Order Service" ..> "Shared" : uses
+"Payment Service" ..> "Shared" : uses
+"Inventory Service" ..> "Shared" : uses
+"User Service" ..> "Shared" : uses
+"Notification Service" ..> "Shared" : uses
+
+"Kafka" ..> "Order Service" : delivers events
+"Kafka" ..> "Payment Service" : delivers events
+"Kafka" ..> "Inventory Service" : delivers events
+"Kafka" ..> "Notification Service" : delivers events
+
+' === ПОЯСНЕНИЯ ===
+note right of "Kafka"
+  Kafka — центральная шина событий:
+  - Все сервисы общаются через события
+  - Нет прямых синхронных вызовов между сервисами
+  - События хранятся для replay
+  - Поддерживает eventual consistency
+end note
+
+note right of "Order Service"
+  Order Service:
+  - Event Sourcing + CQRS
+  - Подписчик на события PaymentCompleted, InventoryReserved
+  - Публикует события жизненного цикла заказа
+end note
+
+@enduml

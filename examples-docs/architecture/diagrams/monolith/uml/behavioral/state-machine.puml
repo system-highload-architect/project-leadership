@@ -1,0 +1,23 @@
+@startuml
+title Диаграмма состояний — жизненный цикл заказа
+
+[*] --> NEW : создание заказа
+NEW --> PAID : оплата получена
+NEW --> CANCELLED : отмена заказа (до оплаты)
+PAID --> SHIPPED : заказ отгружен
+PAID --> CANCELLED : отмена заказа (возврат средств)
+SHIPPED --> DELIVERED : доставка выполнена
+SHIPPED --> CANCELLED : возврат товара (возврат средств)
+DELIVERED --> [*] : заказ завершён
+CANCELLED --> [*] : заказ отменён
+
+note right of NEW
+  Статусы:
+  - NEW: новый заказ
+  - PAID: оплачен
+  - SHIPPED: отгружен
+  - DELIVERED: доставлен
+  - CANCELLED: отменён
+end note
+
+@enduml

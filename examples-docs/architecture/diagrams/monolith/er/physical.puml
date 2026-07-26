@@ -1,0 +1,151 @@
+@startuml
+title Физическая ER-диаграмма — E‑Commerce Platform (PostgreSQL 15+)
+
+' === ПОЛЬЗОВАТЕЛИ ===
+entity "users" as users {
+    * id : UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    --
+    email : VARCHAR(255) NOT NULL UNIQUE
+    password_hash : VARCHAR(255) NOT NULL
+    name : VARCHAR(100) NOT NULL
+    role : VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'manager', 'admin'))
+    created_at : TIMESTAMPTZ DEFAULT NOW()
+    updated_at : TIMESTAMPTZ DEFAULT NOW()
+    *
+    INDEX idx_users_email (email)
+}
+
+' === ТОВАРЫ ===
+entity "products" as products {
+    * id : UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    --
+    name : VARCHAR(255) NOT NULL
+    description : TEXT
+    price : DECIMAL(10,2) NOT NULL CHECK (price >= 0)
+    category : VARCHAR(100)
+    stock : INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0)
+    image_url : TEXT
+    created_at : TIMESTAMPTZ DEFAULT NOW()
+    updated_at : TIMESTAMPTZ DEFAULT NOW()
+    *
+    INDEX idx_products_category (category)
+    INDEX idx_products_name (name)
+}
+
+' === КОРЗИНА ===
+entity "carts" as carts {
+    * id : UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    --
+    user_id : UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE
+    created_at : TIMESTAMPTZ DEFAULT NOW()
+    updated_at : TIMESTAMPTZ DEFAULT NOW()
+}
+
+entity "cart_items" as cart_items {
+    * id : UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    --
+    cart_id : UUID NOT NULL REFERENCES carts(id) ON DELETE CASCADE
+    product_id : UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE
+    quantity : INTEGER NOT NULL CHECK (quantity > 0)
+    price : DECIMAL(10,2) NOT NULL
+    created_at : TIMESTAMPTZ DEFAULT NOW()
+    updated_at : TIMESTAMPTZ DEFAULT NOW()
+    *
+    INDEX idx_cart_items_cart (cart_id)
+    INDEX idx_cart_items_product (product_id)
+}
+
+' === ЗАКАЗЫ ===
+entity "orders" as orders {
+    * id : UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    --
+    user_id : UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT
+    status : VARCHAR(20) NOT NULL DEFAULT 'NEW' CHECK (status IN ('NEW', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'))
+    total_amount : DECIMAL(10,2) NOT NULL DEFAULT 0.00
+    shipping_address : TEXT NOT NULL
+    discount_code : VARCHAR(50)
+    payment_id : UUID
+    created_at : TIMESTAMPTZ DEFAULT NOW()
+    updated_at : TIMESTAMPTZ DEFAULT NOW()
+    *
+    INDEX idx_orders_user (user_id)
+    INDEX idx_orders_status (status)
+    INDEX idx_orders_created (created_at)
+}
+
+entity "order_items" as order_items {
+    * id : UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    --
+    order_id : UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE
+    product_id : UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT
+    product_name : VARCHAR(255) NOT NULL
+    quantity : INTEGER NOT NULL CHECK (quantity > 0)
+    price : DECIMAL(10,2) NOT NULL
+    total : DECIMAL(10,2) GENERATED ALWAYS AS (quantity * price) STORED
+    created_at : TIMESTAMPTZ DEFAULT NOW()
+    *
+    INDEX idx_order_items_order (order_id)
+    INDEX idx_order_items_product (product_id)
+}
+
+' === ПЛАТЕЖИ ===
+entity "payments" as payments {
+    * id : UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    --
+    order_id : UUID NOT NULL REFERENCES orders(id) ON DELETE RESTRICT
+    amount : DECIMAL(10,2) NOT NULL CHECK (amount > 0)
+    method : VARCHAR(20) NOT NULL CHECK (method IN ('CARD', 'SBP', 'PAYPAL'))
+    status : VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'))
+    transaction_id : VARCHAR(255) UNIQUE
+    external_data : JSONB
+    created_at : TIMESTAMPTZ DEFAULT NOW()
+    updated_at : TIMESTAMPTZ DEFAULT NOW()
+    *
+    INDEX idx_payments_order (order_id)
+    INDEX idx_payments_status (status)
+    INDEX idx_payments_transaction (transaction_id)
+}
+
+' === СОБЫТИЯ (Event Sourcing) ===
+entity "order_events" as order_events {
+    * id : BIGSERIAL PRIMARY KEY
+    --
+    aggregate_id : UUID NOT NULL
+    event_type : VARCHAR(100) NOT NULL
+    event_data : JSONB NOT NULL
+    event_version : INTEGER NOT NULL DEFAULT 1
+    created_at : TIMESTAMPTZ DEFAULT NOW()
+    *
+    INDEX idx_order_events_aggregate (aggregate_id)
+    INDEX idx_order_events_created (created_at)
+}
+
+' === САГА ===
+entity "saga_state" as saga_state {
+    * id : UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    --
+    saga_type : VARCHAR(50) NOT NULL
+    status : VARCHAR(20) NOT NULL CHECK (status IN ('NEW', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'CANCELLED'))
+    instruction : JSONB NOT NULL
+    step_results : JSONB
+    created_at : TIMESTAMPTZ DEFAULT NOW()
+    updated_at : TIMESTAMPTZ DEFAULT NOW()
+    *
+    INDEX idx_saga_state_type_status (saga_type, status)
+    INDEX idx_saga_state_created (created_at)
+}
+
+' === СВЯЗИ (каскады) ===
+users ||--o{ carts : "CASCADE"
+carts ||--|{ cart_items : "CASCADE"
+products ||--o{ cart_items : "CASCADE"
+
+users ||--o{ orders : "RESTRICT"
+orders ||--|{ order_items : "CASCADE"
+products ||--o{ order_items : "RESTRICT"
+
+orders ||--o{ payments : "RESTRICT"
+orders ||--o{ order_events : "CASCADE"
+orders ||--o{ saga_state : "CASCADE"
+
+@enduml

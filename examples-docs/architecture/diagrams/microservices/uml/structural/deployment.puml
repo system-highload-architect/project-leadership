@@ -1,0 +1,130 @@
+@startuml
+title Диаграмма развертывания — E‑Commerce Platform (микросервисы)
+
+' === УЗЛЫ ===
+node "Kubernetes Cluster" as k8s {
+    node "Ingress" as ingress
+    
+    node "API Gateway" as gateway_node {
+        artifact "api-gateway.jar" as gateway_artifact
+    }
+    
+    node "Order Service" as order_node {
+        artifact "order-service.jar" as order_artifact
+    }
+    
+    node "Payment Service" as payment_node {
+        artifact "payment-service.jar" as payment_artifact
+    }
+    
+    node "Inventory Service" as inventory_node {
+        artifact "inventory-service.jar" as inventory_artifact
+    }
+    
+    node "User Service" as user_node {
+        artifact "user-service.jar" as user_artifact
+    }
+    
+    node "Notification Service" as notification_node {
+        artifact "notification-service.jar" as notification_artifact
+    }
+    
+    node "Kafka (Cluster)" as kafka_node {
+        artifact "kafka" as kafka_artifact
+    }
+    
+    node "Redis (Cluster)" as redis_node {
+        artifact "redis" as redis_artifact
+    }
+    
+    node "PostgreSQL (Order DB)" as order_db_node {
+        artifact "postgres-order" as order_db_artifact
+    }
+    
+    node "PostgreSQL (Payment DB)" as payment_db_node {
+        artifact "postgres-payment" as payment_db_artifact
+    }
+    
+    node "PostgreSQL (Inventory DB)" as inventory_db_node {
+        artifact "postgres-inventory" as inventory_db_artifact
+    }
+    
+    node "PostgreSQL (User DB)" as user_db_node {
+        artifact "postgres-user" as user_db_artifact
+    }
+    
+    node "PostgreSQL (Notification DB)" as notification_db_node {
+        artifact "postgres-notification" as notification_db_artifact
+    }
+}
+
+' === ВНЕШНИЕ УЗЛЫ ===
+node "Cloud" as cloud {
+    node "Payment Gateway" as payment_gateway_node {
+        artifact "payment-gateway" as payment_gateway_artifact
+    }
+    node "Delivery Service" as delivery_node {
+        artifact "delivery-service" as delivery_artifact
+    }
+}
+
+' === КОММУНИКАЦИОННЫЕ ПУТИ ===
+ingress --> gateway_node : HTTPS (REST/gRPC)
+gateway_node --> order_node : gRPC
+gateway_node --> payment_node : gRPC
+gateway_node --> user_node : gRPC
+
+order_node --> payment_node : gRPC (Saga)
+order_node --> inventory_node : gRPC (Saga)
+order_node --> notification_node : gRPC (Saga)
+
+order_node --> order_db_node : JDBC
+payment_node --> payment_db_node : JDBC
+inventory_node --> inventory_db_node : JDBC
+user_node --> user_db_node : JDBC
+notification_node --> notification_db_node : JDBC
+
+order_node --> redis_node : RESP
+inventory_node --> redis_node : RESP
+
+order_node --> kafka_node : Kafka Protocol
+payment_node --> kafka_node : Kafka Protocol
+inventory_node --> kafka_node : Kafka Protocol
+kafka_node --> notification_node : Kafka Protocol
+
+payment_node --> payment_gateway_node : HTTPS
+order_node --> delivery_node : HTTPS
+
+' === АРТЕФАКТЫ НА УЗЛАХ ===
+gateway_artifact -- gateway_node
+order_artifact -- order_node
+payment_artifact -- payment_node
+inventory_artifact -- inventory_node
+user_artifact -- user_node
+notification_artifact -- notification_node
+kafka_artifact -- kafka_node
+redis_artifact -- redis_node
+order_db_artifact -- order_db_node
+payment_db_artifact -- payment_db_node
+inventory_db_artifact -- inventory_db_node
+user_db_artifact -- user_db_node
+notification_db_artifact -- notification_db_node
+payment_gateway_artifact -- payment_gateway_node
+delivery_artifact -- delivery_node
+
+' === ПОЯСНЕНИЯ ===
+note right of k8s
+  Kubernetes:
+  - Each service runs in its own Pod(s)
+  - Horizontal scaling via HPA
+  - Service discovery via DNS
+end note
+
+note bottom of order_node
+  Order Service:
+  - Event Sourcing + CQRS
+  - Saga Orchestrator
+  - Uses its own DB
+end note
+
+@enduml

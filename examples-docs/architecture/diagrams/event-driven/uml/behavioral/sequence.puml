@@ -1,0 +1,47 @@
+@startuml
+title Диаграмма последовательности — Создание заказа (Event‑Driven)
+
+actor "Покупатель" as Customer
+participant "Web UI" as UI
+participant "API Gateway" as Gateway
+participant "Kafka" as Kafka
+participant "Order Service" as Order
+participant "Payment Service" as Payment
+participant "Inventory Service" as Inventory
+participant "Notification Service" as Notification
+participant "Payment Gateway" as PaymentGateway
+
+Customer -> UI : Оформляет заказ
+UI -> Gateway : POST /orders
+Gateway -> Kafka : Публикует CreateOrderCommand
+
+Kafka -> Order : Доставляет CreateOrderCommand
+Order -> Order : Создаёт агрегат Order (NEW)
+Order -> Order : Сохраняет OrderCreated в Event Store
+Order -> Kafka : Публикует OrderCreated
+
+Kafka -> Payment : Доставляет OrderCreated
+Kafka -> Inventory : Доставляет OrderCreated
+Kafka -> Notification : Доставляет OrderCreated
+
+Payment -> PaymentGateway : Authorize payment
+PaymentGateway --> Payment : Payment success
+Payment -> Kafka : Публикует PaymentCompleted
+
+Inventory -> Inventory : Резервирует товары
+Inventory -> Kafka : Публикует InventoryReserved
+
+Kafka -> Order : Доставляет PaymentCompleted
+Kafka -> Order : Доставляет InventoryReserved
+
+Order -> Order : Обновляет статус на PAID
+Order -> Kafka : Публикует OrderPaid
+
+Kafka -> Notification : Доставляет OrderPaid
+Notification -> Notification : Отправляет уведомление клиенту
+
+Order --> Gateway : Order created (асинхронный ответ)
+Gateway --> UI : 202 Accepted
+UI --> Customer : Заказ создан
+
+@enduml

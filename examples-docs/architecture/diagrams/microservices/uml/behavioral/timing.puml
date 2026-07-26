@@ -1,0 +1,45 @@
+@startuml
+title Временная диаграмма — Жизненный цикл заказа (микросервисы)
+
+concise "Order Status" as OrderState
+concise "Payment Status" as PaymentState
+concise "Inventory Status" as InventoryState
+concise "Notification Status" as NotificationState
+
+@0
+OrderState is "NEW"
+PaymentState is "PENDING"
+InventoryState is "AVAILABLE"
+NotificationState is "PENDING"
+
+@5
+OrderState is "NEW"
+PaymentState is "SUCCESS"
+InventoryState is "AVAILABLE"
+NotificationState is "PENDING"
+
+@10
+OrderState is "PAID"
+PaymentState is "SUCCESS"
+InventoryState is "RESERVED"
+NotificationState is "PENDING"
+
+@20
+OrderState is "PAID"
+PaymentState is "SUCCESS"
+InventoryState is "RESERVED"
+NotificationState is "SENT"
+
+@30
+OrderState is "SHIPPED"
+PaymentState is "SUCCESS"
+InventoryState is "RESERVED"
+NotificationState is "SENT"
+
+@40
+OrderState is "DELIVERED"
+PaymentState is "SUCCESS"
+InventoryState is "CONFIRMED"
+NotificationState is "SENT"
+
+@enduml

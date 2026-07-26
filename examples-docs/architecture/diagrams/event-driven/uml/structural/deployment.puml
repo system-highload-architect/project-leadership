@@ -1,0 +1,66 @@
+@startuml
+title Диаграмма развёртывания — E‑Commerce Platform (Event‑Driven)
+
+' === УЗЛЫ ===
+node "API Gateway" as gateway
+node "Kafka Cluster" as kafka
+node "Order Service" as order
+node "Payment Service" as payment
+node "Inventory Service" as inventory
+node "User Service" as user
+node "Notification Service" as notification
+
+node "Database Cluster" as db_cluster {
+    node "Order DB" as order_db
+    node "Payment DB" as payment_db
+    node "Inventory DB" as inventory_db
+    node "User DB" as user_db
+    node "Notification DB" as notification_db
+}
+
+node "External Systems" as external {
+    node "Payment Gateway" as payment_gateway
+    node "Delivery Service" as delivery_service
+}
+
+' === СВЯЗИ ===
+' API Gateway → Kafka (публикация команд)
+gateway --> kafka : "publishes commands"
+
+' Kafka → Сервисы (доставка событий)
+kafka --> order : "delivers events"
+kafka --> payment : "delivers events"
+kafka --> inventory : "delivers events"
+kafka --> notification : "delivers events"
+
+' Сервисы → Kafka (публикация событий)
+order --> kafka : "publishes events"
+payment --> kafka : "publishes events"
+inventory --> kafka : "publishes events"
+notification --> kafka : "publishes events"
+
+' Сервисы → Базы данных
+order --> order_db : "uses SQL"
+payment --> payment_db : "uses SQL"
+inventory --> inventory_db : "uses SQL"
+user --> user_db : "uses SQL"
+notification --> notification_db : "uses SQL"
+
+' Внешние связи
+payment --> payment_gateway : "HTTPS/REST"
+order --> delivery_service : "HTTP/REST"
+
+' === ПОЯСНЕНИЯ ===
+note right of kafka
+  Центральная шина событий
+  Все коммуникации через события
+  Топики: orders, payments, inventory, notifications
+end note
+
+note right of db_cluster
+  Каждый сервис владеет своей БД
+  Нет прямых связей между БД
+  Синхронизация через события (Kafka)
+end note
+
+@enduml

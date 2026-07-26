@@ -1,0 +1,53 @@
+@startuml
+title Диаграмма компонентов — модуль Order Service
+
+' === КОМПОНЕНТЫ ===
+component "Order Service" as OrderService {
+  port "REST API" as REST
+  port "gRPC API" as GRPC
+  port "Kafka Producer" as KafkaOut
+  port "Kafka Consumer" as KafkaIn
+  
+  component "Delivery Layer" as Delivery
+  component "Use Cases" as UseCases
+  component "Domain" as Domain
+  component "Repository" as Repo
+  component "Event Sourcing" as EventSourcing
+  component "Projection" as Projection
+}
+
+' === ИНТЕРФЕЙСЫ ===
+interface "OrderRepository" as RepoInterface
+interface "EventPublisher" as PubInterface
+interface "EventStore" as StoreInterface
+
+' === СВЯЗИ ===
+REST --> Delivery
+GRPC --> Delivery
+Delivery --> UseCases : uses
+UseCases --> Domain : uses
+UseCases --> RepoInterface : requires
+UseCases --> PubInterface : requires
+UseCases --> StoreInterface : requires
+
+RepoInterface <|-- Repo : implements
+PubInterface <|-- EventSourcing : implements
+StoreInterface <|-- EventSourcing : implements
+
+UseCases --> EventSourcing : uses
+Projection --> KafkaIn : consumes
+Projection --> Repo : writes
+
+' === ВНЕШНИЕ КОМПОНЕНТЫ ===
+component "Kafka" as Kafka
+component "PostgreSQL (Write DB)" as WriteDB
+component "PostgreSQL (Read DB)" as ReadDB
+component "PostgreSQL (Event Store)" as EventStoreDB
+
+KafkaOut --> Kafka : publishes
+KafkaIn <-- Kafka : subscribes
+Repo --> WriteDB : reads/writes
+Repo --> ReadDB : reads
+EventSourcing --> EventStoreDB : reads/writes
+
+@enduml

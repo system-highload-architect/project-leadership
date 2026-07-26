@@ -1,0 +1,84 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+LAYOUT_WITH_LEGEND()
+title Динамическая диаграмма — Создание заказа (Event‑Driven)
+
+' === УЧАСТНИКИ ===
+Person(customer, "Покупатель")
+
+System_Ext(web_ui, "Web UI")
+System_Ext(api_gateway, "API Gateway")
+System_Ext(kafka, "Kafka (Центральная шина)")
+System_Ext(order_service, "Order Service")
+System_Ext(payment_service, "Payment Service")
+System_Ext(inventory_service, "Inventory Service")
+System_Ext(notification_service, "Notification Service")
+System_Ext(payment_gateway, "Платёжный шлюз")
+System_Ext(delivery_service, "Сервис доставки")
+
+' === СЦЕНАРИЙ (все через события) ===
+Rel(customer, web_ui, "1. Оформляет заказ", "HTTPS")
+Rel(web_ui, api_gateway, "2. POST /orders", "HTTPS/REST")
+Rel(api_gateway, kafka, "3. Публикует CreateOrderCommand (команда как событие)", "Kafka Protocol")
+
+Rel(kafka, order_service, "4. Доставляет CreateOrderCommand", "Kafka Protocol")
+Rel(order_service, order_service, "5. Создаёт агрегат Order (NEW)")
+Rel(order_service, order_service, "6. Сохраняет OrderCreated в Event Store")
+Rel(order_service, kafka, "7. Публикует OrderCreated", "Kafka Protocol")
+
+' === ПАРАЛЛЕЛЬНЫЕ ПОДПИСЧИКИ ===
+Rel(kafka, payment_service, "8. Доставляет OrderCreated", "Kafka Protocol")
+Rel(payment_service, payment_gateway, "9. Обрабатывает платёж", "HTTPS/REST")
+Rel(payment_gateway, payment_service, "10. Payment success", "HTTPS/REST")
+Rel(payment_service, kafka, "11. Публикует PaymentCompleted", "Kafka Protocol")
+
+Rel(kafka, inventory_service, "12. Доставляет OrderCreated (или PaymentCompleted)", "Kafka Protocol")
+Rel(inventory_service, inventory_service, "13. Резервирует товары")
+Rel(inventory_service, kafka, "14. Публикует InventoryReserved", "Kafka Protocol")
+
+Rel(kafka, notification_service, "15. Доставляет OrderCreated (или PaymentCompleted)", "Kafka Protocol")
+Rel(notification_service, notification_service, "16. Формирует уведомление")
+Rel(notification_service, kafka, "17. Публикует NotificationSent", "Kafka Protocol")
+
+' === ПОДПИСКА ДЛЯ ОБНОВЛЕНИЯ СТАТУСА ЗАКАЗА ===
+Rel(kafka, order_service, "18. Доставляет PaymentCompleted", "Kafka Protocol")
+Rel(order_service, order_service, "19. Обновляет статус заказа на PAID")
+Rel(order_service, kafka, "20. Публикует OrderPaid", "Kafka Protocol")
+
+' === ОБНОВЛЕНИЕ ПРОЕКЦИЙ ===
+Rel(kafka, order_service, "21. Доставляет OrderPaid", "Kafka Protocol")
+Rel(order_service, order_service, "22. Обновляет read-модель (проекцию)", "SQL")
+
+' === УВЕДОМЛЕНИЕ КЛИЕНТА ===
+Rel(kafka, notification_service, "23. Доставляет OrderPaid", "Kafka Protocol")
+Rel(notification_service, customer, "24. Отправляет подтверждение клиенту", "Email/SMS")
+
+' === ПОЯСНЕНИЯ ===
+note right of kafka
+  Все коммуникации происходят через события:
+  - CreateOrderCommand (команда как событие)
+  - OrderCreated
+  - PaymentCompleted
+  - InventoryReserved
+  - NotificationSent
+  - OrderPaid
+  - OrderCancelled (при ошибке)
+end note
+
+note right of order_service
+  Order Service:
+  - Подписчик на команды и события
+  - Публикует события жизненного цикла
+  - Строит read-модели (CQRS)
+  - Event Sourcing
+end note
+
+note right of payment_service
+  Payment Service:
+  - Подписчик на OrderCreated
+  - Обрабатывает платёж через внешний шлюз
+  - Публикует PaymentCompleted или PaymentFailed
+end note
+
+@enduml

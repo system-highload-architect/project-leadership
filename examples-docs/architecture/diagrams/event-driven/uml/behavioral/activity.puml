@@ -1,0 +1,60 @@
+@startuml
+title Диаграмма деятельности — Создание заказа (Event‑Driven)
+
+start
+
+:Покупатель оформляет заказ;
+:Валидация данных (корзина, адрес);
+
+if (Корзина пуста?) then (Да)
+    :Показать ошибку "Корзина пуста";
+    stop
+else (Нет)
+endif
+
+:API Gateway публикует CreateOrderCommand в Kafka;
+:Kafka доставляет команду в Order Service;
+
+:Order Service создаёт агрегат Order (NEW);
+:Order Service сохраняет OrderCreated в Event Store;
+:Order Service публикует OrderCreated в Kafka;
+
+:Kafka доставляет OrderCreated в Payment Service;
+:Kafka доставляет OrderCreated в Inventory Service;
+:Kafka доставляет OrderCreated в Notification Service;
+
+partition "Параллельная обработка" {
+    :Payment Service обрабатывает платёж;
+    if (Платёж успешен?) then (Да)
+        :Payment Service публикует PaymentCompleted;
+    else (Нет)
+        :Payment Service публикует PaymentFailed;
+    endif
+    
+    :Inventory Service резервирует товары;
+    if (Резервирование успешно?) then (Да)
+        :Inventory Service публикует InventoryReserved;
+    else (Нет)
+        :Inventory Service публикует InventoryFailed;
+    endif
+}
+
+:Kafka доставляет PaymentCompleted в Order Service;
+:Kafka доставляет InventoryReserved в Order Service;
+
+if (PaymentCompleted И InventoryReserved получены?) then (Да)
+    :Order Service обновляет статус на PAID;
+    :Order Service публикует OrderPaid;
+else (Нет)
+    :Order Service запускает компенсацию;
+    :Order Service публикует OrderCancelled;
+endif
+
+:Kafka доставляет OrderPaid в Notification Service;
+:Notification Service отправляет уведомление клиенту;
+
+:Покупатель видит подтверждение заказа;
+
+stop
+
+@enduml

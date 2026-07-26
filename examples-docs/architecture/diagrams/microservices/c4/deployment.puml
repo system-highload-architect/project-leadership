@@ -1,0 +1,129 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+LAYOUT_WITH_LEGEND()
+title Диаграмма развёртывания — E‑Commerce Platform (микросервисы)
+
+' === КЛАСТЕР KUBERNETES ===
+Deployment_Node(k8s_cluster, "Kubernetes Cluster", "k3s / managed") {
+    
+    ' === NODE: Ingress ===
+    Deployment_Node(ingress_node, "Ingress Controller", "Nginx Ingress") {
+        Container(ingress, "Ingress", "Nginx", "Маршрутизация трафика, TLS")
+    }
+    
+    ' === NODE: API Gateway ===
+    Deployment_Node(gateway_node, "API Gateway Pods", "Go + Gin") {
+        Container(api_gateway, "API Gateway", "Go", "Единая точка входа")
+    }
+    
+    ' === NODE: Сервисы ===
+    Deployment_Node(services_node, "Service Pods") {
+        Container(order_service, "Order Service", "Go", "Заказы (Event Sourcing + CQRS + Saga)")
+        Container(payment_service, "Payment Service", "Go", "Платежи")
+        Container(inventory_service, "Inventory Service", "Go", "Товары и остатки")
+        Container(user_service, "User Service", "Go", "Пользователи")
+        Container(notification_service, "Notification Service", "Go", "Уведомления")
+    }
+    
+    ' === NODE: Базы данных ===
+    Deployment_Node(db_node, "Database Pods", "StatefulSet") {
+        ContainerDb(order_db, "Order DB (Write + Event Store)", "PostgreSQL 15+", "Нормализованная схема + события")
+        ContainerDb(order_read_db, "Order Read DB", "PostgreSQL 15+", "Денормализованные проекции")
+        ContainerDb(payment_db, "Payment DB", "PostgreSQL 15+", "Данные о платежах")
+        ContainerDb(inventory_db, "Inventory DB", "PostgreSQL 15+", "Товары и остатки")
+        ContainerDb(user_db, "User DB", "PostgreSQL 15+", "Пользователи, роли")
+        ContainerDb(notification_db, "Notification DB", "PostgreSQL 15+", "История уведомлений")
+    }
+    
+    ' === NODE: Kafka ===
+    Deployment_Node(kafka_node, "Kafka Pods", "StatefulSet") {
+        Container(kafka, "Kafka", "Apache Kafka 3.x", "Брокер событий")
+    }
+    
+    ' === NODE: Redis ===
+    Deployment_Node(redis_node, "Redis Pods", "StatefulSet") {
+        Container(redis, "Redis", "Redis 6.2+", "Распределённый кэш")
+    }
+    
+    ' === NODE: Мониторинг ===
+    Deployment_Node(monitoring_node, "Monitoring Pods") {
+        Container(prometheus, "Prometheus", "Prometheus", "Сбор метрик")
+        Container(grafana, "Grafana", "Grafana", "Визуализация")
+        Container(loki, "Loki", "Loki", "Сбор логов")
+        Container(jaeger, "Jaeger", "Jaeger", "Распределённая трассировка")
+    }
+}
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+System_Ext(payment_gateway, "Платёжный шлюз")
+System_Ext(delivery_service, "Сервис доставки")
+System_Ext(analytics, "Система аналитики")
+
+' === СВЯЗИ ===
+Rel(ingress, api_gateway, "Маршрутизирует", "HTTPS")
+Rel(ingress, user_service, "Маршрутизирует", "HTTPS")
+
+' === API GATEWAY → СЕРВИСЫ ===
+Rel(api_gateway, order_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, payment_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, inventory_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, user_service, "Маршрутизирует", "gRPC")
+Rel(api_gateway, notification_service, "Маршрутизирует", "gRPC")
+
+' === МЕЖСЕРВИСНАЯ КОММУНИКАЦИЯ ===
+Rel(order_service, payment_service, "Saga", "gRPC")
+Rel(order_service, inventory_service, "Saga", "gRPC")
+Rel(order_service, notification_service, "Saga", "gRPC")
+
+' === БАЗЫ ДАННЫХ ===
+Rel(order_service, order_db, "Читает/пишет", "SQL")
+Rel(order_service, order_read_db, "Читает", "SQL")
+Rel(payment_service, payment_db, "Читает/пишет", "SQL")
+Rel(inventory_service, inventory_db, "Читает/пишет", "SQL")
+Rel(user_service, user_db, "Читает/пишет", "SQL")
+Rel(notification_service, notification_db, "Читает/пишет", "SQL")
+
+' === KAFKA ===
+Rel(order_service, kafka, "Публикует события", "Kafka Protocol")
+Rel(payment_service, kafka, "Публикует события", "Kafka Protocol")
+Rel(inventory_service, kafka, "Публикует события", "Kafka Protocol")
+Rel(kafka, notification_service, "Доставляет события", "Kafka Protocol")
+Rel(kafka, analytics, "Доставляет события", "Kafka Protocol")
+
+' === КЭШ ===
+Rel(user_service, redis, "Читает/пишет", "RESP")
+Rel(inventory_service, redis, "Читает/пишет", "RESP")
+
+' === ВНЕШНИЕ ВЫЗОВЫ ===
+Rel(payment_service, payment_gateway, "Обработка платежей", "HTTPS/REST")
+Rel(order_service, delivery_service, "Создание заявок", "HTTP/REST")
+
+' === МОНИТОРИНГ ===
+Rel(order_service, prometheus, "Экспортирует метрики", "HTTP")
+Rel(payment_service, prometheus, "Экспортирует метрики", "HTTP")
+Rel(inventory_service, prometheus, "Экспортирует метрики", "HTTP")
+Rel(user_service, prometheus, "Экспортирует метрики", "HTTP")
+Rel(notification_service, prometheus, "Экспортирует метрики", "HTTP")
+
+Rel(prometheus, grafana, "Визуализация", "HTTP")
+Rel(order_service, loki, "Отправляет логи", "HTTP")
+Rel(order_service, jaeger, "Отправляет трейсы", "gRPC")
+
+' === ПОЯСНЕНИЯ ===
+note right of db_node
+  Базы данных:
+  - Каждый сервис имеет свою БД
+  - Оркестратор использует свою БД для состояния Saga
+  - Event Store находится в Order DB
+end note
+
+note right of services_node
+  Service Mesh (опционально):
+  - Istio или Linkerd
+  - Управление трафиком
+  - mTLS между сервисами
+  - Наблюдаемость
+end note
+
+@enduml

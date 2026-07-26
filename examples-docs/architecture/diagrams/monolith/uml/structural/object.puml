@@ -1,0 +1,43 @@
+@startuml
+title Диаграмма объектов — создание заказа (пример)
+
+' === ОБЪЕКТЫ (экземпляры классов) ===
+object "order: Order" as order {
+  ID = "550e8400-e29b-41d4-a716-446655440000"
+  Status = "NEW"
+  TotalAmount = 0.00
+  ShippingAddress = "ул. Ленина, д. 1"
+  CreatedAt = "2026-07-26T10:00:00Z"
+}
+
+object "orderItem1: OrderItem" as item1 {
+  ProductID = "123e4567-e89b-12d3-a456-426614174000"
+  ProductName = "Ноутбук"
+  Quantity = 2
+  Price = 50000.00
+  Total = 100000.00
+}
+
+object "orderItem2: OrderItem" as item2 {
+  ProductID = "987e6543-e21b-34d5-a678-426614174001"
+  ProductName = "Мышь"
+  Quantity = 1
+  Price = 1500.00
+  Total = 1500.00
+}
+
+object "event: OrderCreated" as event {
+  AggregateID = "550e8400-e29b-41d4-a716-446655440000"
+  CustomerID = "123e4567-e89b-12d3-a456-426614174001"
+  Items = [orderItem1, orderItem2]
+  TotalAmount = 101500.00
+  Timestamp = "2026-07-26T10:00:00Z"
+  Version = 1
+}
+
+' === СВЯЗИ ===
+order *-- item1 : contains
+order *-- item2 : contains
+order ..> event : generates
+
+@enduml

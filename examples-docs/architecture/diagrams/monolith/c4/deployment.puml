@@ -1,0 +1,82 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+LAYOUT_WITH_LEGEND()
+title Диаграмма развёртывания — E‑Commerce Platform (модульный монолит)
+
+' === КЛАСТЕР KUBERNETES ===
+Deployment_Node(k8s_cluster, "Kubernetes Cluster", "k3s / managed") {
+    
+    ' === NODE: Ingress ===
+    Deployment_Node(ingress_node, "Ingress Controller", "Nginx Ingress") {
+        Container(ingress, "Ingress", "Nginx", "Маршрутизация трафика, TLS")
+    }
+    
+    ' === NODE: Frontend ===
+    Deployment_Node(frontend_node, "Frontend Pods", "React + Vite") {
+        Container(frontend, "Web UI", "React", "Пользовательский интерфейс")
+    }
+    
+    ' === NODE: Backend (монолит) ===
+    Deployment_Node(backend_node, "Backend Pods", "Go 1.23+") {
+        Container(backend, "Backend (модульный монолит)", "Go", "Бизнес-логика")
+    }
+    
+    ' === NODE: PostgreSQL ===
+    Deployment_Node(postgres_node, "PostgreSQL Pods", "StatefulSet") {
+        ContainerDb(postgres_write, "PostgreSQL (Write DB)", "PostgreSQL 15+", "Нормализованная схема")
+        ContainerDb(postgres_read, "PostgreSQL (Read DB)", "PostgreSQL 15+", "Денормализованные проекции")
+        ContainerDb(event_store, "Event Store", "PostgreSQL 15+", "Хранилище событий")
+    }
+    
+    ' === NODE: Kafka ===
+    Deployment_Node(kafka_node, "Kafka Pods", "StatefulSet") {
+        Container(kafka, "Kafka", "Apache Kafka 3.x", "Брокер событий")
+    }
+    
+    ' === NODE: Redis ===
+    Deployment_Node(redis_node, "Redis Pods", "StatefulSet") {
+        Container(redis, "Redis", "Redis 6.2+", "Кэш")
+    }
+    
+    ' === NODE: Мониторинг ===
+    Deployment_Node(monitoring_node, "Monitoring Pods") {
+        Container(prometheus, "Prometheus", "Prometheus", "Сбор метрик")
+        Container(grafana, "Grafana", "Grafana", "Визуализация")
+        Container(loki, "Loki", "Loki", "Сбор логов")
+    }
+}
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+System_Ext(payment_gateway, "Платёжный шлюз")
+System_Ext(notification_service, "Сервис уведомлений")
+System_Ext(delivery_service, "Сервис доставки")
+
+' === СВЯЗИ МЕЖДУ КОНТЕЙНЕРАМИ ===
+Rel(ingress, frontend, "Маршрутизирует", "HTTPS")
+Rel(ingress, backend, "Маршрутизирует", "gRPC/HTTP")
+
+Rel(backend, postgres_write, "Читает/пишет", "SQL")
+Rel(backend, postgres_read, "Читает", "SQL")
+Rel(backend, event_store, "Читает/пишет", "SQL")
+Rel(backend, redis, "Читает/пишет", "RESP")
+Rel(backend, kafka, "Публикует события", "Kafka Protocol")
+
+Rel(backend, payment_gateway, "Внешний вызов", "HTTPS/REST")
+Rel(backend, notification_service, "Внешний вызов", "SMTP/HTTP")
+Rel(backend, delivery_service, "Внешний вызов", "HTTP/REST")
+
+Rel(backend, prometheus, "Экспортирует метрики", "HTTP")
+Rel(prometheus, grafana, "Визуализация", "HTTP")
+Rel(backend, loki, "Отправляет логи", "HTTP")
+
+' === ПРИМЕЧАНИЯ ===
+note right of backend_node
+  Масштабирование:
+  - Backend: HPA (горизонтальное)
+  - PostgreSQL: репликация (1 мастер + N реплик)
+  - Kafka: 3+ брокера
+  - Redis: кластер (sentinel)
+end note
+
+@enduml

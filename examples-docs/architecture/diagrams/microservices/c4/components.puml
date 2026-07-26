@@ -1,0 +1,84 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+title Диаграмма компонентов — Order Service (микросервис)
+
+Container(order_service, "Order Service", "Go", "Управление заказами (Event Sourcing + CQRS + Saga Orchestrator)")
+
+' === КОМПОНЕНТЫ (Clean Architecture) ===
+Component(delivery, "Delivery Layer", "Gin / gRPC", "Обрабатывает HTTP/gRPC-запросы, валидация, маршрутизация")
+
+Component(usecase, "Use Cases", "Go", "Бизнес-логика: создание, отмена, изменение статуса заказа")
+Component(domain, "Domain", "Go", "Сущности (Order, OrderItem), правила, Value Objects")
+
+' === ИНТЕРФЕЙСЫ (Ports) ===
+Component(repo_port, "Repository Port", "Go interface", "Интерфейс доступа к данным (Write + Read)")
+Component(event_port, "Event Publisher Port", "Go interface", "Интерфейс публикации событий")
+Component(saga_port, "Saga Participant Port", "Go interface", "Интерфейс для Saga Orchestrator")
+
+' === АДАПТЕРЫ ===
+Component(postgres_adapter, "Postgres Adapter", "Go + pgx", "Реализация репозитория (Write DB, Read DB, Event Store)")
+Component(kafka_adapter, "Kafka Adapter", "Go + Sarama", "Публикация событий в Kafka")
+Component(saga_adapter, "Saga Orchestrator", "Go", "Управляет Saga (создание заказа)")
+
+' === EVENT SOURCING + CQRS ===
+Component(event_sourcing, "Event Sourcing", "Go", "Хранит/восстанавливает агрегаты из Event Store")
+Component(projection, "Projection Service", "Go", "Строит read-модели из событий (CQRS)")
+
+' === ВНУТРЕННИЕ ЗАВИСИМОСТИ ===
+Rel(delivery, usecase, "Вызывает", "зависит")
+Rel(usecase, domain, "Использует", "зависит")
+Rel(usecase, repo_port, "Вызывает", "зависит (интерфейс)")
+Rel(usecase, event_port, "Вызывает", "зависит (интерфейс)")
+
+Rel(postgres_adapter, repo_port, "Реализует", "реализует интерфейс")
+Rel(kafka_adapter, event_port, "Реализует", "реализует интерфейс")
+
+Rel(usecase, event_sourcing, "Использует", "зависит")
+Rel(event_sourcing, postgres_adapter, "Сохраняет/читает события", "SQL")
+Rel(projection, postgres_adapter, "Записывает read-модели", "SQL")
+Rel(projection, kafka_adapter, "Подписывается на события", "Kafka")
+
+' === SAGA ===
+Rel(usecase, saga_adapter, "Запускает Saga", "зависит")
+Rel(saga_adapter, saga_port, "Вызывает", "зависит (интерфейс)")
+
+' === ВНЕШНИЕ СВЯЗИ ===
+Rel_D(order_service, payment_service, "gRPC (Saga шаг: платёж)", "Синхронный вызов")
+Rel_D(order_service, inventory_service, "gRPC (Saga шаг: резервирование)", "Синхронный вызов")
+Rel_D(order_service, notification_service, "gRPC (уведомление)", "Асинхронный")
+
+' === ПОЯСНЕНИЯ ===
+note right of usecase
+  Use Cases:
+  - CreateOrder (запускает Saga)
+  - CancelOrder (компенсация)
+  - UpdateOrderStatus
+  - GetOrder (читает из Read DB)
+  - ListOrders
+end note
+
+note right of event_sourcing
+  Event Sourcing:
+  - Сохраняет события (OrderCreated, OrderPaid, etc.)
+  - Восстанавливает агрегаты из событий
+  - Использует снапшоты для ускорения
+end note
+
+note right of projection
+  Projection Service:
+  - Строит read-модели (денормализованные таблицы)
+  - Обновляется асинхронно через Kafka
+  - Поддерживает CQRS (разделение команд и запросов)
+end note
+
+note right of saga_adapter
+  Saga Orchestrator:
+  - Управляет процессом создания заказа
+  - Шаги: платёж → резервирование → уведомление
+  - Компенсация при ошибке
+  - Сохраняет состояние Saga в PostgreSQL
+end note
+
+@enduml

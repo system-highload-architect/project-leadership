@@ -1,0 +1,49 @@
+@startuml
+title Диаграмма пакетов — модуль Order Service
+
+' === ПАКЕТЫ (слои Clean Architecture) ===
+package "Delivery" as Delivery {
+  [HTTP Handlers]
+  [gRPC Servers]
+}
+
+package "Use Cases" as UseCases {
+  [Create Order]
+  [Cancel Order]
+  [Get Order]
+  [List Orders]
+}
+
+package "Domain" as Domain {
+  [Order]
+  [OrderItem]
+  [OrderStatus]
+  [Events]
+}
+
+package "Repository" as Repository {
+  [Order Repository]
+  [Event Store]
+}
+
+package "Infrastructure" as Infrastructure {
+  [PostgreSQL Adapter]
+  [Kafka Adapter]
+}
+
+package "Common" as Common {
+  [DTOs]
+  [Exceptions]
+  [Utils]
+}
+
+' === ЗАВИСИМОСТИ ===
+Delivery ..> UseCases : depends on
+UseCases ..> Domain : depends on
+UseCases ..> Repository : depends on
+Repository ..> Infrastructure : depends on
+Infrastructure ..> Common : depends on
+UseCases ..> Common : depends on
+Domain ..> Common : depends on
+
+@enduml

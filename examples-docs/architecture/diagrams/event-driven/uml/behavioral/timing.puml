@@ -1,0 +1,52 @@
+@startuml
+title Временная диаграмма — Жизненный цикл заказа (Event‑Driven)
+
+concise "Order Status" as OrderState
+concise "Payment Status" as PaymentState
+concise "Inventory Status" as InventoryState
+concise "Notification Status" as NotificationState
+concise "Kafka Events" as KafkaState
+
+@0
+OrderState is "NEW"
+PaymentState is "PENDING"
+InventoryState is "AVAILABLE"
+NotificationState is "PENDING"
+KafkaState is "OrderCreated published"
+
+@5
+OrderState is "NEW"
+PaymentState is "SUCCESS"
+InventoryState is "AVAILABLE"
+NotificationState is "PENDING"
+KafkaState is "PaymentCompleted published"
+
+@10
+OrderState is "PAID"
+PaymentState is "SUCCESS"
+InventoryState is "RESERVED"
+NotificationState is "PENDING"
+KafkaState is "InventoryReserved published"
+
+@15
+OrderState is "PAID"
+PaymentState is "SUCCESS"
+InventoryState is "RESERVED"
+NotificationState is "SENT"
+KafkaState is "OrderPaid published"
+
+@25
+OrderState is "SHIPPED"
+PaymentState is "SUCCESS"
+InventoryState is "CONFIRMED"
+NotificationState is "SENT"
+KafkaState is "OrderShipped published"
+
+@40
+OrderState is "DELIVERED"
+PaymentState is "SUCCESS"
+InventoryState is "CONFIRMED"
+NotificationState is "SENT"
+KafkaState is "DeliveryCompleted published"
+
+@enduml

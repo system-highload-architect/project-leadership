@@ -1,0 +1,134 @@
+@startuml
+title Диаграмма объектов — Обработка события PaymentCompleted (Event‑Driven)
+
+' === КОМАНДА ===
+object "cmd:CreateOrderCommand" as cmd_obj {
+    commandId = "cmd-001"
+    customerId = "c6f4b3e0-6b4a-4b1a-8e3c-123456789abc"
+    items = [{"productId":"product-111","quantity":1}]
+    shippingAddress = "г. Москва, ул. Ленина, д. 1"
+    timestamp = "2026-07-26T10:00:00Z"
+}
+
+' === АГРЕГАТ ===
+object "order:Order" as order_obj {
+    id = "550e8400-e29b-41d4-a716-446655440000"
+    customerId = "c6f4b3e0-6b4a-4b1a-8e3c-123456789abc"
+    status = "NEW"
+    totalAmount = 1500.00
+    shippingAddress = "г. Москва, ул. Ленина, д. 1"
+    createdAt = "2026-07-26T10:00:00Z"
+}
+
+object "item:OrderItem" as item_obj {
+    productId = "product-111"
+    productName = "Смартфон X"
+    quantity = 1
+    price = 1200.00
+    total = 1200.00
+}
+
+' === СОБЫТИЯ ===
+object "event1:OrderCreated" as event1_obj {
+    aggregateId = "550e8400-e29b-41d4-a716-446655440000"
+    customerId = "c6f4b3e0-6b4a-4b1a-8e3c-123456789abc"
+    items = [{"productId":"product-111","quantity":1}]
+    totalAmount = 1200.00
+    timestamp = "2026-07-26T10:00:00.001Z"
+    version = 1
+}
+
+object "event2:PaymentCompleted" as event2_obj {
+    paymentId = "payment-001"
+    orderId = "550e8400-e29b-41d4-a716-446655440000"
+    amount = 1200.00
+    timestamp = "2026-07-26T10:00:05.000Z"
+    version = 1
+}
+
+object "event3:InventoryReserved" as event3_obj {
+    reservationId = "res-001"
+    orderId = "550e8400-e29b-41d4-a716-446655440000"
+    productId = "product-111"
+    quantity = 1
+    timestamp = "2026-07-26T10:00:10.000Z"
+    version = 1
+}
+
+object "event4:OrderPaid" as event4_obj {
+    orderId = "550e8400-e29b-41d4-a716-446655440000"
+    paymentId = "payment-001"
+    timestamp = "2026-07-26T10:00:11.000Z"
+    version = 1
+}
+
+' === ОБРАБОТЧИКИ ===
+object "handler:CreateOrderHandler" as handler_obj {
+    repo = "PostgresOrderRepository"
+    eventStore = "PostgresEventStore"
+    eventPublisher = "KafkaEventPublisher"
+}
+
+object "eventHandler:OrderEventHandler" as eventHandler_obj {
+    repo = "PostgresOrderRepository"
+    eventStore = "PostgresEventStore"
+    eventPublisher = "KafkaEventPublisher"
+    eventConsumer = "KafkaEventConsumer"
+}
+
+' === ВНЕШНИЕ ОБЪЕКТЫ (Kafka) ===
+object "kafkaTopic:orders" as kafka_orders_obj {
+    partitions = 3
+    retention = "7 days"
+}
+
+object "kafkaTopic:payments" as kafka_payments_obj {
+    partitions = 3
+    retention = "7 days"
+}
+
+' === СВЯЗИ ===
+cmd_obj --> handler_obj : processed by
+handler_obj --> order_obj : creates
+order_obj *-- item_obj : contains
+order_obj --> event1_obj : generates
+
+event1_obj --> kafka_orders_obj : published to
+event2_obj --> kafka_payments_obj : published to
+
+kafka_payments_obj --> eventHandler_obj : consumed by
+eventHandler_obj --> event2_obj : processes
+eventHandler_obj --> order_obj : updates (status = PAID)
+order_obj --> event4_obj : generates
+
+event4_obj --> kafka_orders_obj : published to
+
+event3_obj --> kafka_orders_obj : published to
+kafka_orders_obj --> eventHandler_obj : consumed by
+eventHandler_obj --> event3_obj : processes
+eventHandler_obj --> order_obj : updates (reservation confirmed)
+
+' === ПОЯСНЕНИЯ ===
+note right of eventHandler_obj
+  OrderEventHandler обрабатывает события:
+  1. PaymentCompleted → обновляет статус заказа на PAID
+  2. InventoryReserved → подтверждает резервирование
+  3. PaymentFailed → запускает компенсацию (OrderCancelled)
+end note
+
+note right of kafka_orders_obj
+  Kafka топик "orders":
+  - OrderCreated
+  - OrderPaid
+  - OrderCancelled
+  - OrderShipped
+end note
+
+note right of kafka_payments_obj
+  Kafka топик "payments":
+  - PaymentCompleted
+  - PaymentFailed
+  - PaymentRefunded
+end note
+
+@enduml

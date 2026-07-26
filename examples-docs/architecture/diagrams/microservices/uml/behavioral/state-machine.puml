@@ -1,0 +1,57 @@
+@startuml
+title Диаграмма состояний — Жизненный цикл заказа (микросервисы)
+
+[*] --> NEW : Заказ создан (OrderCreated)
+
+state NEW {
+    [*] --> AwaitingPayment : Ожидание платежа
+    AwaitingPayment --> PaymentTimeout : Таймаут платежа
+    AwaitingPayment --> PaymentReceived : Платёж успешен
+}
+
+NEW --> CANCELLED : Отмена заказа (до оплаты)
+NEW --> PAID : PaymentReceived
+
+state PAID {
+    [*] --> AwaitingReserve : Ожидание резервирования
+    AwaitingReserve --> ReserveTimeout : Таймаут резервирования
+    AwaitingReserve --> StockReserved : Товары зарезервированы
+}
+
+PAID --> CANCELLED : Отмена заказа (с возвратом)
+PAID --> SHIPPED : Заказ отгружен
+
+state SHIPPED {
+    [*] --> InTransit : В пути
+    InTransit --> Delivered : Доставлен
+    InTransit --> DeliveryFailed : Ошибка доставки
+}
+
+SHIPPED --> DELIVERED : Доставлен
+SHIPPED --> CANCELLED : Отмена в пути
+
+state DELIVERED {
+    [*] --> Completed : Заказ выполнен
+    Completed --> [*] : Завершён
+}
+
+state CANCELLED {
+    [*] --> RefundPending : Ожидание возврата
+    RefundPending --> RefundCompleted : Возврат выполнен
+    RefundCompleted --> [*] : Заказ отменён
+}
+
+' === СОБЫТИЯ ===
+NEW --> PAID : PaymentCompleted (от Payment Service)
+PAID --> SHIPPED : OrderShipped (от Delivery Service)
+SHIPPED --> DELIVERED : DeliveryCompleted (от Delivery Service)
+
+' === КОМПЕНСАЦИЯ ===
+PAID --> CANCELLED : OrderCancelled (компенсация)
+SHIPPED --> CANCELLED : OrderCancelled (компенсация)
+
+' === ТАЙМАУТЫ ===
+NEW --> CANCELLED : PaymentTimeout
+PAID --> CANCELLED : ReserveTimeout
+
+@enduml

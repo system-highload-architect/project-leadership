@@ -1,0 +1,82 @@
+@startuml
+title Диаграмма композитной структуры — Order Service (Event‑Driven)
+
+allowmixing
+
+class OrderService {
+    + commandHandler: CommandHandler
+    + eventHandler: EventHandler
+    + domain: Domain
+    + infrastructure: Infrastructure
+    + eventSourcing: EventSourcing
+    + projection: Projection
+}
+
+class CommandHandler {
+    - orderRepo: OrderRepository
+    - eventStore: EventStore
+    - eventPublisher: EventPublisher
+}
+
+class EventHandler {
+    - orderRepo: OrderRepository
+    - eventStore: EventStore
+    - eventPublisher: EventPublisher
+    - eventConsumer: EventConsumer
+}
+
+class Domain {
+    - order: Order
+    - orderItem: OrderItem
+    - orderStatus: OrderStatus
+}
+
+class Infrastructure {
+    - postgresRepo: PostgresOrderRepository
+    - kafkaProducer: KafkaEventPublisher
+    - kafkaConsumer: KafkaEventConsumer
+    - eventStore: PostgresEventStore
+}
+
+class EventSourcing {
+    - eventStore: EventStore
+    + SaveEvents(aggregateID: UUID, events: []Event): void
+    + LoadEvents(aggregateID: UUID): []Event
+    + ReplayAggregate(aggregateID: UUID): Order
+}
+
+class Projection {
+    - readRepo: OrderReadRepository
+    + OnOrderCreated(event: OrderCreated): void
+    + OnOrderPaid(event: OrderPaid): void
+    + OnOrderCancelled(event: OrderCancelled): void
+}
+
+' === СВЯЗИ ===
+OrderService *-- CommandHandler
+OrderService *-- EventHandler
+OrderService *-- Domain
+OrderService *-- Infrastructure
+OrderService *-- EventSourcing
+OrderService *-- Projection
+
+CommandHandler --> Domain : uses
+CommandHandler --> EventSourcing : uses
+CommandHandler --> Infrastructure : uses
+
+EventHandler --> Domain : uses
+EventHandler --> EventSourcing : uses
+EventHandler --> Infrastructure : uses
+
+EventSourcing --> Infrastructure : uses
+Projection --> Infrastructure : uses
+
+' === ПОЯСНЕНИЯ ===
+note right of EventSourcing
+  Event Sourcing:
+  - Хранит события в Event Store
+  - Восстанавливает агрегаты из событий
+  - Использует снапшоты для ускорения
+end note
+
+@enduml

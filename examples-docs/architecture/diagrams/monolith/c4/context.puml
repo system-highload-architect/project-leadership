@@ -1,0 +1,31 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+title Контекстная диаграмма — E‑Commerce Platform (модульный монолит)
+
+' === ПОЛЬЗОВАТЕЛИ ===
+Person(customer, "Покупатель", "Просматривает каталог, оформляет заказы, оплачивает")
+Person(manager, "Менеджер", "Управляет товарами, заказами, клиентами")
+Person(admin, "Администратор", "Управляет пользователями, настройками, мониторит систему")
+
+' === СИСТЕМА ===
+System(ecommerce, "E‑Commerce Platform", "Платформа для онлайн-продаж (каталог, корзина, заказы, платежи, уведомления)")
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+System_Ext(payment_gateway, "Платёжный шлюз", "Обработка платежей (банковские карты, СБП, PayPal)")
+System_Ext(notification_service, "Сервис уведомлений", "Отправка email, SMS, push-уведомлений")
+System_Ext(delivery_service, "Сервис доставки", "Расчёт стоимости, отслеживание, создание заявок")
+System_Ext(analytics, "Система аналитики", "Сбор данных для отчётов и дашбордов")
+
+' === СВЯЗИ ===
+Rel(customer, ecommerce, "Просматривает каталог, оформляет заказы", "HTTPS")
+Rel(manager, ecommerce, "Управляет товарами и заказами", "HTTPS")
+Rel(admin, ecommerce, "Управляет пользователями и настройками", "HTTPS")
+
+Rel(ecommerce, payment_gateway, "Обрабатывает платежи", "HTTPS/REST")
+Rel(ecommerce, notification_service, "Отправляет уведомления", "SMTP/HTTP")
+Rel(ecommerce, delivery_service, "Создаёт заявки на доставку", "HTTP/REST")
+Rel(ecommerce, analytics, "Отправляет события для аналитики", "Kafka/HTTP")
+
+@enduml

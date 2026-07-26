@@ -1,0 +1,47 @@
+@startuml
+title Диаграмма обзора взаимодействия — Создание заказа (Event‑Driven)
+
+start
+
+:Покупатель оформляет заказ;
+:API Gateway публикует CreateOrderCommand в Kafka;
+:Order Service получает команду;
+
+partition "Order Service" {
+    :Создание заказа (NEW);
+    :Сохранение OrderCreated в Event Store;
+    :Публикация OrderCreated в Kafka;
+}
+
+partition "Параллельная обработка" {
+    :Payment Service обрабатывает платёж;
+    if (Платёж успешен?) then (Да)
+        :Публикация PaymentCompleted;
+    else (Нет)
+        :Публикация PaymentFailed;
+    endif
+    
+    :Inventory Service резервирует товары;
+    if (Резервирование успешно?) then (Да)
+        :Публикация InventoryReserved;
+    else (Нет)
+        :Публикация InventoryFailed;
+    endif
+}
+
+:Order Service получает PaymentCompleted и InventoryReserved;
+
+if (Оба события получены?) then (Да)
+    :Обновление статуса на PAID;
+    :Публикация OrderPaid;
+else (Нет)
+    :Компенсация (OrderCancelled);
+    :Публикация OrderCancelled;
+endif
+
+:Notification Service отправляет уведомление;
+:Покупатель видит подтверждение;
+
+stop
+
+@enduml
