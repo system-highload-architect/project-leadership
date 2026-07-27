@@ -187,12 +187,4 @@ func (r *RobotRepository) Get(ctx context.Context, id string) (*domain.Robot, er
 
 ---
 
-## 📎 Связанные документы
-
-- [ADR: Выбор Hexagonal Architecture](../../docs/architecture/adr/009-hexagonal-choice.md)
-- [Пример реализации Hexagonal в Go](../../patterns-examples/hexagonal-example/README.md)
-- [Clean Architecture vs Hexagonal](../../docs/strategic/clean-vs-hexagonal.md)
-
----
-
 *Hexagonal Architecture — это не про «шестиугольник». Это про **чёткие границы между ядром и миром**.*
