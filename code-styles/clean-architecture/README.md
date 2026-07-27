@@ -159,9 +159,7 @@ func (uc *GetRobotUseCase) Execute(ctx context.Context, input GetRobotInput) (*R
 
 ## 📎 Связанные документы
 
-- [ADR: Выбор Clean Architecture](../../docs/architecture/adr/007-clean-architecture-choice.md)
-- [Пример реализации Clean Architecture в Go](../../patterns-examples/clean-architecture-example/README.md)
-- [Принципы DDD в Clean Architecture](../../docs/strategic/ddd-in-clean-architecture.md)
+- [ADR: Выбор Clean Architecture](../../docs/architecture/adr/004-clean-architecture-choice.md)
 
 ---
 
